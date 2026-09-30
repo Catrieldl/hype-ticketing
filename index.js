@@ -6,12 +6,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Conexión a tu base de datos en Railway
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// Ruta para crear un evento
 app.post('/api/eventos', async (req, res) => {
   try {
     const { nombre, fecha } = req.body;
@@ -21,18 +19,26 @@ app.post('/api/eventos', async (req, res) => {
     );
     res.json(nuevoEvento.rows[0]);
   } catch (err) {
-    console.error(err.message);
     res.status(500).send('Error en el servidor');
   }
 });
 
-// Ruta para ver todos los eventos
 app.get('/api/eventos', async (req, res) => {
   try {
-    const todosLosEventos = await pool.query('SELECT * FROM eventos');
+    const todosLosEventos = await pool.query('SELECT * FROM eventos ORDER BY fecha ASC');
     res.json(todosLosEventos.rows);
   } catch (err) {
-    console.error(err.message);
+    res.status(500).send('Error en el servidor');
+  }
+});
+
+// NUEVO: Ruta para eliminar eventos
+app.delete('/api/eventos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM eventos WHERE id = $1', [id]);
+    res.json({ mensaje: 'Evento eliminado' });
+  } catch (err) {
     res.status(500).send('Error en el servidor');
   }
 });
