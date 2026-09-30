@@ -1,24 +1,43 @@
 const express = require('express');
 const cors = require('cors');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // Permite leer los JSON que manda Nave
+app.use(express.json());
+
+// Conexión a tu base de datos en Railway
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Ruta para crear un evento
+app.post('/api/eventos', async (req, res) => {
+  try {
+    const { nombre, fecha } = req.body;
+    const nuevoEvento = await pool.query(
+      'INSERT INTO eventos (nombre, fecha) VALUES ($1, $2) RETURNING *',
+      [nombre, fecha]
+    );
+    res.json(nuevoEvento.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Error en el servidor');
+  }
+});
+
+// Ruta para ver todos los eventos
+app.get('/api/eventos', async (req, res) => {
+  try {
+    const todosLosEventos = await pool.query('SELECT * FROM eventos');
+    res.json(todosLosEventos.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Error en el servidor');
+  }
+});
 
 const PORT = process.env.PORT || 3000;
-
-// Ruta principal de prueba
-app.get('/', (req, res) => {
-  res.send('El servidor de entradas para Hollywood está online 🚀');
-});
-
-// Endpoint para el Webhook de Nave
-app.post('/api/webhooks/nave', (req, res) => {
-  console.log('Notificación de pago recibida:', req.body);
-  // Nave exige que se le responda con 200 OK
-  res.status(200).send('OK');
-});
-
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
