@@ -1,7 +1,7 @@
 {
   "name": "hype-ticketing",
   "version": "1.0.0",
-  "description": "Plataforma de tickets para Hollywood",
+  "description": "Plataforma de tickets para HYPE VENUE",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
