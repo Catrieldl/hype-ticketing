@@ -112,6 +112,21 @@ app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
   }
 });
 
+// NUEVO: Ruta para que cada vendedor vea el detalle de sus ventas
+app.get('/api/mis-ventas', verificarToken, async (req, res) => {
+  try {
+    const misVentas = await pool.query(`
+      SELECT t.codigo_qr, t.precio, t.sector, e.nombre AS evento
+      FROM tickets t
+      LEFT JOIN eventos e ON t.evento_id = e.id
+      WHERE t.vendedor_id = $1
+    `, [req.usuario.id]);
+    res.json(misVentas.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/ventas/vendedor/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
   try {
