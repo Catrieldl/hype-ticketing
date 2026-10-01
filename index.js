@@ -67,6 +67,34 @@ app.post('/api/eventos', verificarToken, async (req, res) => {
   }
 });
 
+// Crear sector para un evento (Solo Fundador/Admin)
+app.post('/api/sectores', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
+     return res.status(403).json({ error: 'Sin permisos' });
+  }
+  try {
+    const { evento_id, nombre } = req.body;
+    const nuevoSector = await pool.query(
+      'INSERT INTO sectores (evento_id, nombre) VALUES ($1, $2) RETURNING *',
+      [evento_id, nombre]
+    );
+    res.json(nuevoSector.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Listar sectores por evento
+app.get('/api/sectores/:evento_id', async (req, res) => {
+  try {
+    const { evento_id } = req.params;
+    const sectores = await pool.query('SELECT * FROM sectores WHERE evento_id = $1', [evento_id]);
+    res.json(sectores.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/eventos', async (req, res) => {
   try {
     const todosLosEventos = await pool.query('SELECT * FROM eventos ORDER BY fecha ASC');
