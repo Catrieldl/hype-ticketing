@@ -31,7 +31,6 @@ app.post('/api/login', async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.rows[0].password);
     if (!validPassword) return res.status(401).json({ error: 'Contraseña incorrecta' });
 
-    // Se agrega evento_id al payload del token
     const token = jwt.sign({ 
       id: user.rows[0].id, 
       rol: user.rows[0].rol,
@@ -57,14 +56,29 @@ const verificarToken = (req, res, next) => {
 app.post('/api/usuarios', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador puede hacer esto' });
   try {
-    // Se agrega la posibilidad de recibir e insertar evento_id
     const { email, password, rol, evento_id } = req.body;
     const hash = await bcrypt.hash(password, 10);
+    
+    // Lógica UPSERT: Si el email no existe, lo crea. Si ya existe, actualiza sus datos.
     await pool.query(
-      'INSERT INTO usuarios (email, password, rol, evento_id) VALUES ($1, $2, $3, $4)', 
+      `INSERT INTO usuarios (email, password, rol, evento_id) 
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email) 
+       DO UPDATE SET password = EXCLUDED.password, rol = EXCLUDED.rol, evento_id = EXCLUDED.evento_id`, 
       [email, hash, rol, evento_id || null]
     );
-    res.json({ mensaje: 'Usuario creado' });
+    res.json({ mensaje: 'Usuario guardado/actualizado correctamente' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET opcional para listar usuarios si lo necesitas en el frontend
+app.get('/api/usuarios', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    const usuarios = await pool.query('SELECT id, email, rol, evento_id FROM usuarios');
+    res.json(usuarios.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -198,7 +212,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     const vendedor_id = req.usuario.id; 
     const codigo_qr = crypto.randomUUID(); 
 
-    // Bloque de seguridad: Forzar el evento_id asignado si es Vendedor
     if (req.usuario.rol === 'Vendedor') {
       if (!req.usuario.evento_id) {
         return res.status(403).json({ error: 'El vendedor no tiene un evento asignado por el administrador.' });
