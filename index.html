@@ -32,7 +32,8 @@
     <div class="container" id="seccionVentas">
         <h2>Generar Link de Venta (RRPP)</h2>
         <form id="ventasForm">
-            <select id="eventoSelectVentas" required onchange="cargarSectoresVentas(this.value)">
+            <!-- SE ELIMINÓ EL ATRIBUTO REQUIRED AQUÍ PARA EVITAR EL BLOQUEO -->
+            <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)">
                 <option value="">Seleccioná un evento...</option>
             </select>
             
@@ -90,7 +91,6 @@
 
     <div class="container" id="seccionStaff">
         <h2>Gestión de Staff</h2>
-        <!-- Agregamos onkeydown para evitar que el Enter envíe el form sin querer -->
         <form id="staffForm" onkeydown="return event.key != 'Enter';">
             <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
             <input type="password" id="nuevoPass" placeholder="Contraseña" required>
@@ -99,12 +99,10 @@
                 <option value="Vendedor">Vendedor (RRPP)</option>
             </select>
             
-            <!-- Selector de evento oculto por defecto, se muestra si elige Vendedor -->
             <select id="eventoSelectStaff" style="display: none;">
                 <option value="">Seleccioná un evento para asignar...</option>
             </select>
 
-            <!-- Agregamos un type="button" que llame a la función manual, en vez de un submit tradicional -->
             <button type="button" onclick="enviarStaffForm()">Crear Usuario</button>
         </form>
     </div>
@@ -117,7 +115,7 @@
         const API_URL = 'https://hypevenue.up.railway.app/api';
         let token = localStorage.getItem('hype_token');
         let userRol = localStorage.getItem('hype_rol');
-        let userEventoId = localStorage.getItem('hype_evento_id'); // Guardamos el evento asignado
+        let userEventoId = localStorage.getItem('hype_evento_id');
 
         if (token) mostrarDashboard();
 
@@ -159,10 +157,8 @@
                 document.getElementById('seccionStaff').style.display = 'block';
             }
             
-            // Si es Vendedor, le ocultamos el selector de eventos y lo forzamos al suyo
             if (userRol === 'Vendedor') {
                 document.getElementById('eventoSelectVentas').style.display = 'none';
-                document.getElementById('eventoSelectVentas').removeAttribute('required'); // CORRECCIÓN AGREGADA AQUÍ
                 if (userEventoId) {
                     cargarSectoresVentas(userEventoId);
                 }
@@ -229,7 +225,6 @@
             }
         });
 
-        // Función para mostrar/ocultar el selector de eventos al crear usuario
         function toggleEventoStaff(rol) {
             const selector = document.getElementById('eventoSelectStaff');
             if (rol === 'Vendedor') {
@@ -242,7 +237,6 @@
             }
         }
 
-        // Función manual para enviar el formulario de staff
         async function enviarStaffForm() {
             const email = document.getElementById('nuevoEmail').value;
             const password = document.getElementById('nuevoPass').value;
@@ -269,12 +263,11 @@
             alert(data.mensaje || data.error);
             
             document.getElementById('staffForm').reset();
-            toggleEventoStaff('Admin'); // Oculta el selector de nuevo
+            toggleEventoStaff('Admin'); 
         }
 
         document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            // Si es vendedor, el evento_id sale de su localStorage. Si es admin, sale del select.
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
             const sector_id = document.getElementById('sectorSelectVentas').value;
             
@@ -344,7 +337,7 @@
             document.getElementById('eventoSelectVentas').innerHTML = options;
             document.getElementById('eventoSelectSector').innerHTML = options;
             document.getElementById('eventoSelectPreventa').innerHTML = options;
-            document.getElementById('eventoSelectStaff').innerHTML = options; // Carga los eventos también para la creación de usuarios
+            document.getElementById('eventoSelectStaff').innerHTML = options; 
         }
 
         async function cargarSectoresVentas(eventoId) {
