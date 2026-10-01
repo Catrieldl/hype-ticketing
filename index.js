@@ -137,7 +137,6 @@ app.post('/api/preventas', verificarToken, async (req, res) => {
   }
 });
 
-// Listar preventas de un evento
 app.get('/api/preventas/:evento_id', verificarToken, async (req, res) => {
   try {
     const { evento_id } = req.params;
@@ -153,7 +152,6 @@ app.get('/api/preventas/:evento_id', verificarToken, async (req, res) => {
   }
 });
 
-// Actualizar preventa (Precio, Nombre o Fecha Límite)
 app.put('/api/preventas/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
      return res.status(403).json({ error: 'Sin permisos' });
@@ -171,7 +169,6 @@ app.put('/api/preventas/:id', verificarToken, async (req, res) => {
   }
 });
 
-// Borrar preventa
 app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
      return res.status(403).json({ error: 'Sin permisos' });
@@ -225,6 +222,52 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     res.json({ link: linkVenta, precio: preventaActiva.precio, tanda: preventaActiva.nombre });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Ruta para que el cliente final vea su ticket al abrir el link
+app.get('/comprar/:codigo', async (req, res) => {
+  try {
+    const { codigo } = req.params;
+    const ticketQuery = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [codigo]);
+    
+    if (ticketQuery.rows.length === 0) {
+      return res.status(404).send('<h1>Ticket no encontrado o inválido</h1>');
+    }
+
+    const ticket = ticketQuery.rows[0];
+    const eventoQuery = await pool.query('SELECT * FROM eventos WHERE id = $1', [ticket.evento_id]);
+    const evento = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Tu Entrada - Hype Venue</title>
+          <style>
+              body { font-family: Arial; background: #111; color: #fff; text-align: center; padding: 40px; }
+              .card { background: #222; padding: 30px; border-radius: 12px; max-width: 400px; margin: auto; border: 2px solid #444; }
+              h1 { color: #00ffcc; margin-bottom: 10px; }
+              .precio { font-size: 24px; color: #00ffcc; font-weight: bold; margin: 20px 0; }
+              .info { margin: 10px 0; color: #ccc; }
+          </style>
+      </head>
+      <body>
+          <div class="card">
+              <h1>HYPE VENUE</h1>
+              <h3>${evento}</h3>
+              <p class="info">Sector: <strong>${ticket.sector}</strong></p>
+              <div class="precio">$${ticket.precio}</div>
+              <p style="font-size: 12px; color: #888;">Código único: ${ticket.codigo_qr}</p>
+              <p style="margin-top: 20px; font-size: 14px; color: #ffaa00;">Presentá este código en puerta.</p>
+          </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send('Error en el servidor');
   }
 });
 
