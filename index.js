@@ -4,18 +4,24 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const path = require('path'); // Esto hace que Railway sirva el archivo index.html cuando entren a la raíz
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
 const SECRET = process.env.JWT_SECRET || 'hype_venue_secreto_2026';
+
+// Servir la carpeta actual como pública y forzar el index.html en la raíz
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 app.post('/api/login', async (req, res) => {
   try {
@@ -90,7 +96,6 @@ app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
   }
 });
 
-// Crear Sector con Capacidad / Aforo
 app.post('/api/sectores', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
      return res.status(403).json({ error: 'Sin permisos' });
@@ -133,19 +138,16 @@ app.post('/api/preventas', verificarToken, async (req, res) => {
   }
 });
 
-// Generar Ticket controlando el Aforo del Sector
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
     const { evento_id, sector_id } = req.body;
     const vendedor_id = req.usuario.id; 
     const codigo_qr = crypto.randomUUID(); 
 
-    // 1. Verificar capacidad del sector
     const sectorData = await pool.query('SELECT * FROM sectores WHERE id = $1', [sector_id]);
     if (sectorData.rows.length === 0) return res.status(400).json({ error: 'Sector no encontrado' });
     const sector = sectorData.rows[0];
 
-    // Contar cuántos tickets ya se emitieron para este sector
     const ticketsVendidosQuery = await pool.query(
       'SELECT COUNT(*) FROM tickets WHERE evento_id = $1 AND sector = $2',
       [evento_id, sector.nombre]
@@ -156,7 +158,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
       return res.status(400).json({ error: `El sector ${sector.nombre} ha alcanzado su capacidad máxima (${sector.capacidad} entradas).` });
     }
 
-    // 2. Buscar preventa activa
     const preventaQuery = await pool.query(
       'SELECT * FROM preventas WHERE evento_id = $1 AND sector_id = $2 AND (fecha_limite IS NULL OR fecha_limite >= NOW()) ORDER BY fecha_limite ASC LIMIT 1',
       [evento_id, sector_id]
@@ -168,7 +169,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
 
     const preventaActiva = preventaQuery.rows[0];
 
-    // 3. Crear el ticket
     await pool.query(
       'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
       [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre]
