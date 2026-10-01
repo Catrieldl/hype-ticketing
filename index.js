@@ -56,14 +56,14 @@ const verificarToken = (req, res, next) => {
 app.post('/api/usuarios', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
   try {
-    const { email, password, rol, evento_id } = req.body;
+    const { email, password, rol, evento_id, nombre, apellido, whatsapp } = req.body;
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
-      `INSERT INTO usuarios (email, password, rol, evento_id) 
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO usuarios (email, password, rol, evento_id, nombre, apellido, whatsapp) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (email) 
-       DO UPDATE SET password = EXCLUDED.password, rol = EXCLUDED.rol, evento_id = EXCLUDED.evento_id`, 
-      [email, hash, rol, evento_id || null]
+       DO UPDATE SET password = EXCLUDED.password, rol = EXCLUDED.rol, evento_id = EXCLUDED.evento_id, nombre = EXCLUDED.nombre, apellido = EXCLUDED.apellido, whatsapp = EXCLUDED.whatsapp`, 
+      [email, hash, rol, evento_id || null, nombre, apellido, whatsapp]
     );
     res.json({ mensaje: 'Usuario guardado/actualizado' });
   } catch (err) {
@@ -71,7 +71,6 @@ app.post('/api/usuarios', verificarToken, async (req, res) => {
   }
 });
 
-// NUEVO: Borrar usuario (Solo Fundador)
 app.delete('/api/usuarios/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
   try {
@@ -86,7 +85,7 @@ app.get('/api/usuarios', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
     const usuarios = await pool.query(`
-      SELECT u.id, u.email, u.rol, e.nombre AS evento_asignado
+      SELECT u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp, e.nombre AS evento_asignado
       FROM usuarios u
       LEFT JOIN eventos e ON u.evento_id = e.id
       ORDER BY u.rol, u.email
@@ -101,10 +100,10 @@ app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
     const ventas = await pool.query(`
-      SELECT u.id, u.email, u.rol, COUNT(t.id) as total_tickets, COALESCE(SUM(t.precio), 0) as total_recaudado
+      SELECT u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp, COUNT(t.id) as total_tickets, COALESCE(SUM(t.precio), 0) as total_recaudado
       FROM usuarios u
       LEFT JOIN tickets t ON u.id = t.vendedor_id
-      GROUP BY u.id, u.email, u.rol
+      GROUP BY u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp
       ORDER BY total_tickets DESC
     `);
     res.json(ventas.rows);
@@ -113,7 +112,6 @@ app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
   }
 });
 
-// NUEVO: Borrar ventas de un vendedor (Solo Fundador)
 app.delete('/api/ventas/vendedor/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
   try {
@@ -217,7 +215,6 @@ app.put('/api/preventas/:id', verificarToken, async (req, res) => {
   }
 });
 
-// MODIFICADO: Borrar preventa restringido solo a Fundador
 app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador puede borrar preventas' });
   try {
