@@ -5,7 +5,6 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -174,7 +173,7 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
       [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre]
     );
 
-    const linkVenta = `https://hype-ticketing-production.up.railway.app/comprar/${codigo_qr}`;
+    const linkVenta = `https://hypevenue.up.railway.app/comprar/${codigo_qr}`;
     res.json({ link: linkVenta, precio: preventaActiva.precio, tanda: preventaActiva.nombre });
   } catch (err) {
     res.status(500).json({ error: err.message });
