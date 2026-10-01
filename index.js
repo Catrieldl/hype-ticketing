@@ -112,14 +112,14 @@ app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
   }
 });
 
-// NUEVO: Ruta para que cada vendedor vea el detalle de sus ventas
 app.get('/api/mis-ventas', verificarToken, async (req, res) => {
   try {
     const misVentas = await pool.query(`
-      SELECT t.codigo_qr, t.precio, t.sector, e.nombre AS evento
+      SELECT t.codigo_qr, t.precio, t.sector, t.fecha_venta, e.nombre AS evento
       FROM tickets t
       LEFT JOIN eventos e ON t.evento_id = e.id
       WHERE t.vendedor_id = $1
+      ORDER BY COALESCE(t.fecha_venta, '1970-01-01') DESC, t.id DESC
     `, [req.usuario.id]);
     res.json(misVentas.rows);
   } catch (err) {
@@ -275,7 +275,7 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     for(let i = 0; i < cantidad; i++) {
         const codigo_qr = crypto.randomUUID(); 
         await pool.query(
-          'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
+          'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, fecha_venta) VALUES ($1, $2, $3, $4, $5, NOW())',
           [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre]
         );
         linksGenerados.push(`https://hypevenue.up.railway.app/comprar/${codigo_qr}`);
