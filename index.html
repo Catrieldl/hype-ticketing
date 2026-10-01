@@ -19,10 +19,12 @@
         button:hover { background: #ccc; }
         .btn-borrar { background: #cc0000; color: #fff; width: auto; padding: 6px 12px; margin-left: 5px; }
         .btn-editar { background: #0066cc; color: #fff; width: auto; padding: 6px 12px; }
-        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas { display: none; }
+        .btn-actualizar { background: #00ffcc; color: #000; margin-bottom: 15px; }
+        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes { display: none; }
         .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
         .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
         li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 6px; }
+        .stat-badge { background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -49,6 +51,18 @@
             <button type="submit">Generar Link(s)</button>
         </form>
         <div id="resultadoLink"></div>
+    </div>
+
+    <!-- NUEVA SECCIÓN DE REPORTES -->
+    <div class="container" id="seccionReportes">
+        <h2>Reportes y Usuarios</h2>
+        <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
+        
+        <h3 style="margin-top: 20px;">Ventas por Vendedor</h3>
+        <ul id="listaVentasAdmin" style="list-style: none; padding: 0;"></ul>
+        
+        <h3 style="margin-top: 20px;">Lista de Usuarios</h3>
+        <ul id="listaUsuariosAdmin" style="list-style: none; padding: 0;"></ul>
     </div>
 
     <div class="container" id="dashboard">
@@ -149,6 +163,8 @@
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('seccionSectores').style.display = 'block';
                 document.getElementById('seccionPreventas').style.display = 'block';
+                document.getElementById('seccionReportes').style.display = 'block'; // Activar panel reportes
+                cargarReportes();
             }
             if (userRol === 'Fundador') document.getElementById('seccionStaff').style.display = 'block';
             
@@ -227,6 +243,7 @@
             alert(data.mensaje || data.error);
             document.getElementById('staffForm').reset();
             toggleEventoStaff('Admin'); 
+            cargarReportes();
         }
 
         document.getElementById('ventasForm').addEventListener('submit', async (e) => {
@@ -330,6 +347,26 @@
             const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }});
             const prev = await res.json();
             lst.innerHTML = prev.map(p => `<li><span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span><div><button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button><button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button></div></li>`).join('');
+        }
+
+        // NUEVAS FUNCIONES PARA REPORTES
+        async function cargarReportes() {
+            if (userRol !== 'Fundador' && userRol !== 'Admin') return;
+            
+            // Cargar Ventas
+            const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
+            const ventas = await resVentas.json();
+            document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => 
+                `<li><span><strong>${v.email}</strong> (${v.rol})</span>
+                <div><span class="stat-badge">${v.total_tickets} tickets</span> <span class="stat-badge" style="background:#0066cc;">$${v.total_recaudado}</span></div></li>`
+            ).join('');
+
+            // Cargar Usuarios y Roles
+            const resUsu = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${token}` }});
+            const usuarios = await resUsu.json();
+            document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => 
+                `<li><span><strong>${u.email}</strong><br><small style="color:#aaa;">Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span></li>`
+            ).join('');
         }
     </script>
 </body>
