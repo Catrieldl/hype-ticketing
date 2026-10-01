@@ -18,12 +18,12 @@ const pool = new Pool({
 
 const SECRET = process.env.JWT_SECRET || 'hype_venue_secreto_2026';
 
-// CONFIGURACIÓN DE GMAIL (Agregá estas variables en Railway)
+// CONFIGURACIÓN DE GMAIL
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER, // Ej: tu-correo@gmail.com
-        pass: process.env.EMAIL_PASS  // Contraseña de aplicación de Google
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS  
     }
 });
 
@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- RUTAS DE AUTENTICACIÓN Y USUARIOS --- (Mantenidas intactas)
+// --- RUTAS DE AUTENTICACIÓN Y USUARIOS ---
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -106,7 +106,7 @@ app.delete('/api/ventas/vendedor/:id', verificarToken, async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- RUTAS DE EVENTOS, SECTORES Y PREVENTAS --- (Mantenidas intactas)
+// --- RUTAS DE EVENTOS, SECTORES Y PREVENTAS ---
 app.post('/api/eventos', verificarToken, async (req, res) => {
   try { const nuevoEvento = await pool.query('INSERT INTO eventos (nombre, fecha) VALUES ($1, $2) RETURNING *', [req.body.nombre, req.body.fecha]); res.json(nuevoEvento.rows[0]); } 
   catch (err) { res.status(500).send('Error'); }
@@ -166,7 +166,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
 
     const linksGenerados = [];
 
-    // Ahora los tickets se guardan con estado "Pendiente" automáticamente
     for(let i = 0; i < cantidad; i++) {
         const codigo_qr = crypto.randomUUID(); 
         await pool.query(
@@ -182,29 +181,17 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
   }
 });
 
-// --- RUTA NUEVA PARA INICIAR PAGO EN NAVE ---
+// --- RUTA INICIAR PAGO EN NAVE ---
 app.post('/api/iniciar-pago', async (req, res) => {
   try {
       const { codigo, email } = req.body;
       
-      // Actualizamos el ticket con el correo que ingresó el usuario
       const ticketQ = await pool.query('UPDATE tickets SET email_comprador = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', [email, codigo, 'Pendiente']);
       
       if (ticketQ.rows.length === 0) return res.status(400).json({ error: 'Ticket no válido o ya pagado.' });
       const ticket = ticketQ.rows[0];
 
-      // --- NAVE API: AQUÍ VA LA CONEXIÓN A NAVE PARA GENERAR EL LINK DE PAGO ---
-      // Ejemplo de código cuando tengas las credenciales:
-      /*
-      const response = await axios.post('https://api.nave.com/v1/checkout', {
-          monto: ticket.precio,
-          referencia_externa: ticket.codigo_qr,
-          email: email
-      }, { headers: { 'Authorization': `Bearer TU_CLIENT_SECRET_DE_NAVE` }});
-      const urlPago = response.data.url;
-      */
-
-      // Simulador temporal hasta que configures Nave (Borrar esto cuando tengas la API)
+      // Simulador temporal
       const urlPago = `https://hypevenue.up.railway.app/simulador-pago-exitoso/${ticket.codigo_qr}`; 
 
       res.json({ url: urlPago });
@@ -213,11 +200,9 @@ app.post('/api/iniciar-pago', async (req, res) => {
   }
 });
 
-// --- RUTA NUEVA DEL WEBHOOK DE NAVE ---
+// --- WEBHOOK DE NAVE ---
 app.post('/api/webhooks/nave', async (req, res) => {
     try {
-        // NAVE API: Capturar la respuesta real de Nave. 
-        // Suponiendo que Nave manda { status: 'approved', reference: 'codigo_qr_del_ticket' }
         const { status, reference } = req.body; 
 
         if (status === 'approved' || status === 'paid') {
@@ -228,35 +213,39 @@ app.post('/api/webhooks/nave', async (req, res) => {
                 const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [ticketPagado.evento_id]);
                 const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
-                // Mandar el correo con Nodemailer
+                // URL del QR en imagen
+                const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticketPagado.codigo_qr}`;
                 const linkEntrada = `https://hypevenue.up.railway.app/comprar/${ticketPagado.codigo_qr}`;
+                
                 const mailOptions = {
-                    from: '"Hype Venue" <hypevenue@gmail.com>', // Cambiá por tu correo
+                    from: '"Hype Venue" <hypevenue@gmail.com>', 
                     to: ticketPagado.email_comprador,
                     subject: `Tu entrada para ${eventoNombre} está lista`,
                     html: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
                             <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
                             <p>Ya tenés tu lugar asegurado en el sector <strong>${ticketPagado.sector}</strong>.</p>
-                            <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA (CÓDIGO QR)</a>
+                            
+                            <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 20px 0;">
+                                <img src="${qrImageUrl}" alt="Tu Código QR" style="display: block; width: 200px; height: 200px;">
+                            </div>
+                            
+                            <p>Mostrá este QR en puerta.</p>
+                            <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA ONLINE</a>
                            </div>`
                 };
                 transporter.sendMail(mailOptions).catch(console.error);
             }
         }
-        res.sendStatus(200); // Responderle a Nave que recibimos bien la info
+        res.sendStatus(200);
     } catch (err) {
         res.sendStatus(500);
     }
 });
 
-// --- RUTA TEMPORAL PARA SIMULAR QUE NAVE PAGÓ (Borrar luego) ---
 app.get('/simulador-pago-exitoso/:codigo', async (req, res) => {
-    // Simulamos que el webhook de Nave llamó a nuestro servidor
     await axios.post('http://localhost:' + PORT + '/api/webhooks/nave', { status: 'approved', reference: req.params.codigo });
-    // Redirigimos al cliente a su entrada
     res.redirect(`/comprar/${req.params.codigo}`);
 });
-
 
 // --- VISTA FINAL DEL COMPRADOR ---
 app.get('/comprar/:codigo', async (req, res) => {
@@ -268,7 +257,6 @@ app.get('/comprar/:codigo', async (req, res) => {
     const eventoQuery = await pool.query('SELECT * FROM eventos WHERE id = $1', [ticket.evento_id]);
     const evento = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
-    // SI ESTÁ PENDIENTE: Le pedimos el correo para ir a Nave
     if (ticket.estado === 'Pendiente') {
         return res.send(`
             <!DOCTYPE html>
@@ -311,7 +299,7 @@ app.get('/comprar/:codigo', async (req, res) => {
                             body: JSON.stringify({ codigo: '${ticket.codigo_qr}', email: email })
                         });
                         const data = await response.json();
-                        if(data.url) window.location.href = data.url; // Redirige a Nave
+                        if(data.url) window.location.href = data.url; 
                         else alert('Error al iniciar pago');
                     });
                 </script>
@@ -320,7 +308,8 @@ app.get('/comprar/:codigo', async (req, res) => {
         `);
     }
 
-    // SI ESTÁ PAGADO: Le mostramos la entrada final
+    // SI ESTÁ PAGADO: Mostramos la entrada con la IMAGEN del QR
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}`;
     res.send(`
       <!DOCTYPE html>
       <html lang="es">
@@ -344,8 +333,13 @@ app.get('/comprar/:codigo', async (req, res) => {
               <h3>${evento}</h3>
               <p class="info">Sector: <strong>${ticket.sector}</strong></p>
               <div class="precio">$${ticket.precio}</div>
+              
+              <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 15px 0;">
+                  <img src="${qrImageUrl}" alt="Código QR" style="display: block; width: 200px; height: 200px;">
+              </div>
+              
               <p style="font-size: 12px; color: #888;">Código único: ${ticket.codigo_qr}</p>
-              <p style="margin-top: 20px; font-size: 14px; color: #ffaa00;">Presentá esta pantalla en puerta.</p>
+              <p style="margin-top: 20px; font-size: 14px; color: #ffaa00;">Presentá este QR en puerta.</p>
           </div>
       </body>
       </html>
