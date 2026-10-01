@@ -31,8 +31,14 @@ app.post('/api/login', async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.rows[0].password);
     if (!validPassword) return res.status(401).json({ error: 'Contraseña incorrecta' });
 
-    const token = jwt.sign({ id: user.rows[0].id, rol: user.rows[0].rol }, SECRET, { expiresIn: '8h' });
-    res.json({ token, rol: user.rows[0].rol });
+    // Se agrega evento_id al payload del token
+    const token = jwt.sign({ 
+      id: user.rows[0].id, 
+      rol: user.rows[0].rol,
+      evento_id: user.rows[0].evento_id 
+    }, SECRET, { expiresIn: '8h' });
+    
+    res.json({ token, rol: user.rows[0].rol, evento_id: user.rows[0].evento_id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -51,9 +57,13 @@ const verificarToken = (req, res, next) => {
 app.post('/api/usuarios', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador puede hacer esto' });
   try {
-    const { email, password, rol } = req.body;
+    // Se agrega la posibilidad de recibir e insertar evento_id
+    const { email, password, rol, evento_id } = req.body;
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('INSERT INTO usuarios (email, password, rol) VALUES ($1, $2, $3)', [email, hash, rol]);
+    await pool.query(
+      'INSERT INTO usuarios (email, password, rol, evento_id) VALUES ($1, $2, $3, $4)', 
+      [email, hash, rol, evento_id || null]
+    );
     res.json({ mensaje: 'Usuario creado' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -184,9 +194,17 @@ app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
 
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    const { evento_id, sector_id } = req.body;
+    let { evento_id, sector_id } = req.body;
     const vendedor_id = req.usuario.id; 
     const codigo_qr = crypto.randomUUID(); 
+
+    // Bloque de seguridad: Forzar el evento_id asignado si es Vendedor
+    if (req.usuario.rol === 'Vendedor') {
+      if (!req.usuario.evento_id) {
+        return res.status(403).json({ error: 'El vendedor no tiene un evento asignado por el administrador.' });
+      }
+      evento_id = req.usuario.evento_id;
+    }
 
     const sectorData = await pool.query('SELECT * FROM sectores WHERE id = $1', [sector_id]);
     if (sectorData.rows.length === 0) return res.status(400).json({ error: 'Sector no encontrado' });
@@ -225,7 +243,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
   }
 });
 
-// Ruta para que el cliente final vea su ticket al abrir el link
 app.get('/comprar/:codigo', async (req, res) => {
   try {
     const { codigo } = req.params;
