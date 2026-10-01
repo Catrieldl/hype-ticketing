@@ -20,7 +20,7 @@
         .btn-borrar { background: #cc0000; color: #fff; width: auto; padding: 6px 12px; margin-left: 5px; }
         .btn-editar { background: #0066cc; color: #fff; width: auto; padding: 6px 12px; }
         .btn-actualizar { background: #00ffcc; color: #000; margin-bottom: 15px; }
-        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes { display: none; }
+        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas { display: none; }
         .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
         .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
         li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 6px; }
@@ -53,6 +53,13 @@
             <button type="submit">Generar Link(s)</button>
         </form>
         <div id="resultadoLink"></div>
+    </div>
+
+    <!-- NUEVA SECCIÓN DE VENTAS DETALLADAS PARA EL VENDEDOR -->
+    <div class="container" id="seccionMisVentas">
+        <h2>Mis Ventas</h2>
+        <div id="resumenMisVentas" style="margin-bottom: 15px;"></div>
+        <ul id="listaMisVentas" style="list-style: none; padding: 0;"></ul>
     </div>
 
     <div class="container" id="seccionReportes">
@@ -174,7 +181,9 @@
             
             if (userRol === 'Vendedor') {
                 document.getElementById('eventoSelectVentas').style.display = 'none';
+                document.getElementById('seccionMisVentas').style.display = 'block';
                 if (userEventoId) cargarSectoresVentas(userEventoId);
+                cargarMisVentas();
             } else {
                 cargarEventos();
             }
@@ -287,7 +296,11 @@
                         <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
-                cargarReportes(); 
+                if (userRol === 'Vendedor') {
+                    cargarMisVentas();
+                } else {
+                    cargarReportes(); 
+                }
             } else {
                 alert(data.error || 'Error al generar links');
             }
@@ -301,7 +314,7 @@
         function copiarLink(textoCodificado) {
             const texto = decodeURIComponent(textoCodificado);
             navigator.clipboard.writeText(texto).then(() => {
-                alert('¡Links copiados!');
+                alert('¡Link copiado!');
             }).catch(() => alert('Error al copiar'));
         }
 
@@ -416,6 +429,27 @@
                 await fetch(`${API_URL}/ventas/vendedor/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
                 cargarReportes();
             }
+        }
+
+        async function cargarMisVentas() {
+            const res = await fetch(`${API_URL}/mis-ventas`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const ventas = await res.json();
+            
+            const totalTickets = ventas.length;
+            const totalRecaudado = ventas.reduce((acc, v) => acc + Number(v.precio), 0);
+            
+            document.getElementById('resumenMisVentas').innerHTML = `
+                <span class="stat-badge" style="background:#333;">${totalTickets} tickets vendidos</span> 
+                <span class="stat-badge" style="background:#00ffcc; color:#000;">Total: $${totalRecaudado}</span>
+            `;
+            
+            document.getElementById('listaMisVentas').innerHTML = ventas.map((v) => {
+                const linkUrl = `https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`;
+                return `<li>
+                    <span><strong>${v.sector}</strong> - $${v.precio}<br><small style="color:#aaa;">Evento: ${v.evento || 'N/A'}</small></span>
+                    <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Copiar</button>
+                </li>`;
+            }).join('');
         }
     </script>
 </body>
