@@ -162,6 +162,7 @@
             // Si es Vendedor, le ocultamos el selector de eventos y lo forzamos al suyo
             if (userRol === 'Vendedor') {
                 document.getElementById('eventoSelectVentas').style.display = 'none';
+                document.getElementById('eventoSelectVentas').removeAttribute('required'); // CORRECCIÓN AGREGADA AQUÍ
                 if (userEventoId) {
                     cargarSectoresVentas(userEventoId);
                 }
