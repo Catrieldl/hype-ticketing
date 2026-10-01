@@ -5,29 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel - Hype Venue</title>
     
-    <!-- Tipografía moderna -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Montserrat', sans-serif; padding: 20px; background: #f4f4f4; }
-        .container { background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        h2 { margin-top: 0; font-weight: 700; color: #111; }
-        input, select, button { font-family: 'Montserrat', sans-serif; padding: 12px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
-        button { background: #111; color: white; border: none; cursor: pointer; font-weight: 600; transition: background 0.3s; }
-        button:hover { background: #333; }
-        .btn-borrar { background: #cc0000; width: auto; padding: 6px 12px; margin-left: 5px; }
-        .btn-editar { background: #0066cc; width: auto; padding: 6px 12px; }
+        body { font-family: 'Jost', sans-serif; padding: 20px; background: #000; color: #fff; }
+        .container { background: #111; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #333; }
+        h2 { margin-top: 0; font-weight: 500; color: #fff; text-transform: uppercase; letter-spacing: 4px; }
+        h3 { font-weight: 400; letter-spacing: 2px; }
+        input, select, button { font-family: 'Jost', sans-serif; padding: 12px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 15px; }
+        button { background: #fff; color: #000; border: none; cursor: pointer; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: background 0.3s; }
+        button:hover { background: #ccc; }
+        .btn-borrar { background: #cc0000; color: #fff; width: auto; padding: 6px 12px; margin-left: 5px; }
+        .btn-editar { background: #0066cc; color: #fff; width: auto; padding: 6px 12px; }
         #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas { display: none; }
-        .error { color: #cc0000; font-weight: 600; margin-bottom: 10px; }
-        .link-generado { background: #f8f9fa; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #111; border-radius: 4px; }
-        li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fafafa; padding: 10px; border: 1px solid #eee; border-radius: 6px; }
+        .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
+        .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
+        li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 6px; }
     </style>
 </head>
 <body>
     <div class="container" id="loginScreen">
-        <h2>Ingresar - Hype Venue</h2>
+        <h2>Ingresar - HYPE</h2>
         <div id="loginError" class="error"></div>
         <form id="loginForm">
             <input type="email" id="emailLogin" placeholder="Email" required>
@@ -37,7 +37,7 @@
     </div>
 
     <div class="container" id="seccionVentas">
-        <h2>Generar Link de Venta (RRPP)</h2>
+        <h2>Generar Venta</h2>
         <form id="ventasForm">
             <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)">
                 <option value="">Seleccioná un evento...</option>
@@ -46,7 +46,7 @@
                 <option value="">Primero seleccioná un evento...</option>
             </select>
             <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de entradas">
-            <button type="submit">Generar Link(s) Automático</button>
+            <button type="submit">Generar Link(s)</button>
         </form>
         <div id="resultadoLink"></div>
     </div>
@@ -63,7 +63,7 @@
     </div>
 
     <div class="container" id="seccionSectores">
-        <h2>Crear Sector y Aforo</h2>
+        <h2>Crear Sector</h2>
         <form id="sectorForm">
             <select id="eventoSelectSector" required>
                 <option value="">Seleccioná un evento...</option>
@@ -75,7 +75,7 @@
     </div>
 
     <div class="container" id="seccionPreventas">
-        <h2>Configurar Preventas / Tandas</h2>
+        <h2>Configurar Tandas</h2>
         <form id="preventaForm">
             <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value); cargarPreventasAdmin(this.value);">
                 <option value="">Seleccioná un evento...</option>
@@ -85,7 +85,7 @@
             </select>
             <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1" required>
             <input type="number" id="precioPreventa" placeholder="Precio ($)" required>
-            <label style="font-size: 12px; color: #555; font-weight: 600;">Fecha límite (opcional):</label>
+            <label style="font-size: 12px; color: #aaa; font-weight: 500;">Fecha límite (opcional):</label>
             <input type="datetime-local" id="fechaLimitePreventa">
             <button type="submit">Guardar Preventa</button>
         </form>
@@ -94,7 +94,7 @@
     </div>
 
     <div class="container" id="seccionStaff">
-        <h2>Gestión de Staff</h2>
+        <h2>Staff</h2>
         <form id="staffForm" onkeydown="return event.key != 'Enter';">
             <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
             <input type="password" id="nuevoPass" placeholder="Contraseña" required>
@@ -109,8 +109,8 @@
         </form>
     </div>
     
-    <div class="container" id="logoutContainer" style="display:none; text-align: center; background: transparent; box-shadow: none;">
-        <button onclick="cerrarSesion()" style="background: #888; width: 50%;">Cerrar Sesión</button>
+    <div class="container" id="logoutContainer" style="display:none; text-align: center; background: transparent; box-shadow: none; border: none;">
+        <button onclick="cerrarSesion()" style="background: #444; color: #fff; width: 50%;">Cerrar Sesión</button>
     </div>
 
     <script>
@@ -247,7 +247,7 @@
             const data = await res.json();
             
             botonSubmit.disabled = false;
-            botonSubmit.innerText = 'Generar Link(s) Automático';
+            botonSubmit.innerText = 'Generar Link(s)';
             
             if (data.links) {
                 const textoLinks = data.links.join('\n\n');
@@ -255,12 +255,12 @@
                 
                 document.getElementById('resultadoLink').innerHTML = `
                     <div class="link-generado">
-                        <p style="margin-top: 0; font-weight: bold; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
+                        <p style="margin-top: 0; font-weight: 500; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
                         <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #0066cc; flex: 1;">📋 Copiar Link(s)</button>
-                            <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: bold; box-sizing: border-box; font-size: 14px;">💬 WhatsApp</a>
+                            <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #fff; color: #000; flex: 1;">📋 Copiar</button>
+                            <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: 600; text-transform: uppercase; box-sizing: border-box; font-size: 14px; letter-spacing: 1px;">WhatsApp</a>
                         </div>
-                        <button type="button" onclick="nuevaVenta()" style="background: #444; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
+                        <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
             } else {
@@ -268,7 +268,6 @@
             }
         });
 
-        // Función nueva para reiniciar la vista de ventas rápido
         function nuevaVenta() {
             document.getElementById('resultadoLink').innerHTML = '';
             document.getElementById('cantidadVentas').value = 1;
