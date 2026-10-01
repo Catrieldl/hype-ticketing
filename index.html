@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel - Hype Venue</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f4f4f4; }
+        .container { background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto; margin-bottom: 20px; }
+        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #333; color: white; border: none; cursor: pointer; }
+        button:hover { background: #555; }
+        .btn-borrar { background: #cc0000; width: auto; padding: 5px 10px; margin-left: 10px; }
+        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas { display: none; }
+        .error { color: red; }
+        .link-generado { background: #eef; padding: 15px; word-break: break-all; margin-top: 10px; font-weight: bold; border-left: 4px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="container" id="loginScreen">
+        <h2>Ingresar - Hype Venue</h2>
+        <div id="loginError" class="error"></div>
+        <form id="loginForm">
+            <input type="email" id="emailLogin" placeholder="Email" required>
+            <input type="password" id="passLogin" placeholder="Contraseña" required>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+
+    <div class="container" id="seccionVentas">
+        <h2>Generar Link de Venta (RRPP)</h2>
+        <form id="ventasForm">
+            <select id="eventoSelectVentas" required onchange="cargarSectoresVentas(this.value)">
+                <option value="">Seleccioná un evento...</option>
+            </select>
+            
+            <select id="sectorSelectVentas" required>
+                <option value="">Primero seleccioná un evento...</option>
+            </select>
+
+            <button type="submit">Generar Link Automático</button>
+        </form>
+        <div id="resultadoLink"></div>
+    </div>
+
+    <div class="container" id="dashboard">
+        <h2>Crear Evento</h2>
+        <form id="eventoForm">
+            <input type="text" id="nombre" placeholder="Ej: Hype Season 1" required>
+            <input type="datetime-local" id="fecha" required>
+            <button type="submit">Guardar Evento</button>
+        </form>
+        <h3>Eventos Activos</h3>
+        <ul id="listaEventos"></ul>
+    </div>
+
+    <div class="container" id="seccionSectores">
+        <h2>Crear Sector y Aforo</h2>
+        <form id="sectorForm">
+            <select id="eventoSelectSector" required>
+                <option value="">Seleccioná un evento...</option>
+            </select>
+            <input type="text" id="nombreSector" placeholder="Ej: VIP, General, +21" required>
+            <input type="number" id="capacidadSector" placeholder="Capacidad máxima (Aforo)" required>
+            <button type="submit">Guardar Sector</button>
+        </form>
+    </div>
+
+    <div class="container" id="seccionPreventas">
+        <h2>Configurar Preventas / Tandas de Precios</h2>
+        <form id="preventaForm">
+            <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value)">
+                <option value="">Seleccioná un evento...</option>
+            </select>
+            <select id="sectorSelectPreventa" required>
+                <option value="">Primero seleccioná un evento...</option>
+            </select>
+            <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1, Early Bird" required>
+            <input type="number" id="precioPreventa" placeholder="Precio ($)" required>
+            <label style="font-size: 12px; color: #555;">Fecha límite de vigencia (opcional):</label>
+            <input type="datetime-local" id="fechaLimitePreventa">
+            <button type="submit">Guardar Preventa</button>
+        </form>
+    </div>
+
+    <div class="container" id="seccionStaff">
+        <h2>Gestión de Staff</h2>
+        <form id="staffForm">
+            <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
+            <input type="password" id="nuevoPass" placeholder="Contraseña" required>
+            <select id="nuevoRol">
+                <option value="Admin">Administrador</option>
+                <option value="Vendedor">Vendedor (RRPP)</option>
+            </select>
+            <button type="submit">Crear Usuario</button>
+        </form>
+    </div>
+    
+    <div class="container" id="logoutContainer" style="display:none; text-align: center;">
+        <button onclick="cerrarSesion()" style="background: #888; width: 50%;">Cerrar Sesión</button>
+    </div>
+
+    <script>
+        const API_URL = 'https://hype-ticketing-production.up.railway.app/api';
+        let token = localStorage.getItem('hype_token');
+        let userRol = localStorage.getItem('hype_rol');
+
+        if (token) mostrarDashboard();
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch(`${API_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: document.getElementById('emailLogin').value, password: document.getElementById('passLogin').value })
+            });
+            const data = await res.json();
+            if (data.token) {
+                token = data.token; userRol = data.rol;
+                localStorage.setItem('hype_token', token); localStorage.setItem('hype_rol', userRol);
+                mostrarDashboard();
+            } else {
+                document.getElementById('loginError').innerText = data.error;
+                document.getElementById('loginError').style.display = 'block';
+            }
+        });
+
+        function mostrarDashboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('logoutContainer').style.display = 'block';
+            document.getElementById('seccionVentas').style.display = 'block';
+            
+            if (userRol === 'Fundador' || userRol === 'Admin') {
+                document.getElementById('dashboard').style.display = 'block';
+                document.getElementById('seccionSectores').style.display = 'block';
+                document.getElementById('seccionPreventas').style.display = 'block';
+            }
+            if (userRol === 'Fundador') {
+                document.getElementById('seccionStaff').style.display = 'block';
+            }
+            cargarEventos();
+        }
+
+        function cerrarSesion() {
+            localStorage.clear(); location.reload();
+        }
+
+        document.getElementById('eventoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await fetch(`${API_URL}/eventos`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ nombre: document.getElementById('nombre').value, fecha: document.getElementById('fecha').value })
+            });
+            cargarEventos();
+        });
+
+        document.getElementById('sectorForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const evento_id = document.getElementById('eventoSelectSector').value;
+            const nombre = document.getElementById('nombreSector').value;
+            const capacidad = document.getElementById('capacidadSector').value;
+            
+            const res = await fetch(`${API_URL}/sectores`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ evento_id, nombre, capacidad })
+            });
+            const data = await res.json();
+            if (data.id) {
+                alert('Sector y aforo creados exitosamente');
+                document.getElementById('sectorForm').reset();
+                cargarEventos();
+            } else {
+                alert(data.error || 'Error al crear sector');
+            }
+        });
+
+        document.getElementById('preventaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const evento_id = document.getElementById('eventoSelectPreventa').value;
+            const sector_id = document.getElementById('sectorSelectPreventa').value;
+            const nombre = document.getElementById('nombrePreventa').value;
+            const precio = document.getElementById('precioPreventa').value;
+            const fecha_limite = document.getElementById('fechaLimitePreventa').value || null;
+            
+            const res = await fetch(`${API_URL}/preventas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ evento_id, sector_id, nombre, precio, fecha_limite })
+            });
+            const data = await res.json();
+            if (data.id) {
+                alert('Preventa configurada exitosamente');
+                document.getElementById('preventaForm').reset();
+            } else {
+                alert(data.error || 'Error al configurar preventa');
+            }
+        });
+
+        document.getElementById('staffForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch(`${API_URL}/usuarios`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ 
+                    email: document.getElementById('nuevoEmail').value, 
+                    password: document.getElementById('nuevoPass').value, 
+                    rol: document.getElementById('nuevoRol').value 
+                })
+            });
+            const data = await res.json();
+            alert(data.mensaje || data.error);
+            document.getElementById('staffForm').reset();
+        });
+
+        document.getElementById('ventasForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const evento_id = document.getElementById('eventoSelectVentas').value;
+            const sector_id = document.getElementById('sectorSelectVentas').value;
+            
+            const res = await fetch(`${API_URL}/tickets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ evento_id, sector_id })
+            });
+            const data = await res.json();
+            
+            if (data.link) {
+                document.getElementById('resultadoLink').innerHTML = `<div class="link-generado">Link listo (${data.tanda} - $${data.precio}). Mandalo por WhatsApp:<br><br><a href="${data.link}" target="_blank">${data.link}</a></div>`;
+            } else {
+                alert(data.error || 'Error al generar el link');
+            }
+        });
+
+        async function borrarEvento(id) {
+            if(confirm('¿Seguro?')) {
+                await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                cargarEventos();
+            }
+        }
+
+        async function cargarEventos() {
+            const res = await fetch(`${API_URL}/eventos`);
+            const eventos = await res.json();
+            
+            if (userRol === 'Fundador' || userRol === 'Admin') {
+                document.getElementById('listaEventos').innerHTML = eventos.map(e => {
+                    let btnBorrar = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarEvento(${e.id})">Eliminar</button>` : '';
+                    return `<li><span><strong>${e.nombre}</strong> - ${new Date(e.fecha).toLocaleString()}</span>${btnBorrar}</li>`;
+                }).join('');
+            }
+
+            const options = '<option value="">Seleccioná un evento...</option>' + 
+                eventos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+
+            document.getElementById('eventoSelectVentas').innerHTML = options;
+            document.getElementById('eventoSelectSector').innerHTML = options;
+            document.getElementById('eventoSelectPreventa').innerHTML = options;
+        }
+
+        async function cargarSectoresVentas(eventoId) {
+            const select = document.getElementById('sectorSelectVentas');
+            if (!eventoId) { select.innerHTML = '<option value="">Primero seleccioná un evento...</option>'; return; }
+            const res = await fetch(`${API_URL}/sectores/${eventoId}`);
+            const sectores = await res.json();
+            select.innerHTML = '<option value="">Seleccioná un sector...</option>' + 
+                sectores.map(s => `<option value="${s.id}">${s.nombre} (Cap: ${s.capacidad})</option>`).join('');
+        }
+
+        async function cargarSectoresPreventa(eventoId) {
+            const select = document.getElementById('sectorSelectPreventa');
+            if (!eventoId) { select.innerHTML = '<option value="">Primero seleccioná un evento...</option>'; return; }
+            const res = await fetch(`${API_URL}/sectores/${eventoId}`);
+            const sectores = await res.json();
+            select.innerHTML = '<option value="">Seleccioná un sector...</option>' + 
+                sectores.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+        }
+    </script>
+</body>
+</html>
