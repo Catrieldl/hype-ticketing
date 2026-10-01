@@ -71,6 +71,39 @@ app.post('/api/usuarios', verificarToken, async (req, res) => {
   }
 });
 
+// NUEVO: Ruta para listar todos los usuarios y sus roles
+app.get('/api/usuarios', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    const usuarios = await pool.query(`
+      SELECT u.id, u.email, u.rol, e.nombre AS evento_asignado
+      FROM usuarios u
+      LEFT JOIN eventos e ON u.evento_id = e.id
+      ORDER BY u.rol, u.email
+    `);
+    res.json(usuarios.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// NUEVO: Ruta para ver cantidad de ventas por vendedor
+app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    const ventas = await pool.query(`
+      SELECT u.email, u.rol, COUNT(t.id) as total_tickets, COALESCE(SUM(t.precio), 0) as total_recaudado
+      FROM usuarios u
+      LEFT JOIN tickets t ON u.id = t.vendedor_id
+      GROUP BY u.id, u.email, u.rol
+      ORDER BY total_tickets DESC
+    `);
+    res.json(ventas.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/eventos', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
@@ -174,12 +207,11 @@ app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
   }
 });
 
-// MODIFICADO: Generación múltiple
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
     let { evento_id, sector_id, cantidad } = req.body;
     const vendedor_id = req.usuario.id; 
-    cantidad = parseInt(cantidad) || 1; // Default a 1 si no manda nada
+    cantidad = parseInt(cantidad) || 1;
 
     if (req.usuario.rol === 'Vendedor') {
       if (!req.usuario.evento_id) return res.status(403).json({ error: 'Vendedor sin evento asignado.' });
@@ -207,7 +239,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
 
     const linksGenerados = [];
 
-    // Bucle para insertar "n" tickets
     for(let i = 0; i < cantidad; i++) {
         const codigo_qr = crypto.randomUUID(); 
         await pool.query(
