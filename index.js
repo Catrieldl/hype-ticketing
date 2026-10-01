@@ -3,6 +3,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -87,7 +88,25 @@ app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
     res.status(500).send('Error');
   }
 });
+// Ruta para generar link de venta
+app.post('/api/tickets', verificarToken, async (req, res) => {
+  try {
+    const { evento_id, precio } = req.body;
+    const vendedor_id = req.usuario.id; // El sistema sabe qué vendedor está logueado
+    const codigo_qr = crypto.randomUUID(); // Genera un código alfanumérico único
 
+    await pool.query(
+      'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio) VALUES ($1, $2, $3, $4)',
+      [evento_id, vendedor_id, codigo_qr, precio]
+    );
+
+    // Este es el link que el RRPP le va a mandar al cliente por WhatsApp
+    const linkVenta = `https://hype-ticketing-production.up.railway.app/comprar/${codigo_qr}`;
+    res.json({ link: linkVenta });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Puerto ${PORT}`);
