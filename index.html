@@ -14,7 +14,7 @@
         .btn-editar { background: #0066cc; width: auto; padding: 5px 10px; }
         #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas { display: none; }
         .error { color: red; }
-        .link-generado { background: #eef; padding: 15px; word-break: break-all; margin-top: 10px; font-weight: bold; border-left: 4px solid #333; }
+        .link-generado { background: #eef; padding: 15px; word-break: break-all; margin-top: 10px; border-left: 4px solid #333; }
         li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fafafa; padding: 8px; border: 1px solid #ddd; }
     </style>
 </head>
@@ -32,7 +32,6 @@
     <div class="container" id="seccionVentas">
         <h2>Generar Link de Venta (RRPP)</h2>
         <form id="ventasForm">
-            <!-- SE ELIMINÓ EL ATRIBUTO REQUIRED AQUÍ PARA EVITAR EL BLOQUEO -->
             <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)">
                 <option value="">Seleccioná un evento...</option>
             </select>
@@ -279,11 +278,30 @@
             const data = await res.json();
             
             if (data.link) {
-                document.getElementById('resultadoLink').innerHTML = `<div class="link-generado">Link listo (${data.tanda} - $${data.precio}). Mandalo por WhatsApp:<br><br><a href="${data.link}" target="_blank">${data.link}</a></div>`;
+                const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés el link para comprar tu entrada (${data.tanda} - $${data.precio}): ${data.link}`);
+                
+                document.getElementById('resultadoLink').innerHTML = `
+                    <div class="link-generado">
+                        <p style="margin-top: 0; font-weight: bold;">Link listo (${data.tanda} - $${data.precio})</p>
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button type="button" onclick="copiarLink('${data.link}')" style="background: #0066cc; flex: 1;">📋 Copiar Link</button>
+                            <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 10px; border-radius: 4px; flex: 1; display: inline-block; font-weight: bold; box-sizing: border-box;">💬 WhatsApp</a>
+                        </div>
+                    </div>
+                `;
             } else {
                 alert(data.error || 'Error al generar el link');
             }
         });
+
+        // Función nueva para copiar al portapapeles
+        function copiarLink(link) {
+            navigator.clipboard.writeText(link).then(() => {
+                alert('¡Link copiado!');
+            }).catch(() => {
+                alert('Error al copiar el link');
+            });
+        }
 
         async function borrarEvento(id) {
             if(confirm('¿Seguro querés eliminar este evento?')) {
