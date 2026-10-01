@@ -66,9 +66,10 @@ app.post('/api/eventos', verificarToken, async (req, res) => {
   }
 });
 
+// Devuelve solo eventos futuros (vigentes) para los selectores operativos
 app.get('/api/eventos', async (req, res) => {
   try {
-    const todosLosEventos = await pool.query('SELECT * FROM eventos ORDER BY fecha ASC');
+    const todosLosEventos = await pool.query('SELECT * FROM eventos WHERE fecha >= NOW() ORDER BY fecha ASC');
     res.json(todosLosEventos.rows);
   } catch (err) {
     res.status(500).send('Error');
@@ -114,7 +115,6 @@ app.get('/api/sectores/:evento_id', async (req, res) => {
   }
 });
 
-// Crear Preventa / Tanda de precios
 app.post('/api/preventas', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
      return res.status(403).json({ error: 'Sin permisos' });
@@ -131,14 +131,12 @@ app.post('/api/preventas', verificarToken, async (req, res) => {
   }
 });
 
-// Generar Ticket con Precio Automático según Preventa Activa
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
     const { evento_id, sector_id } = req.body;
     const vendedor_id = req.usuario.id; 
     const codigo_qr = crypto.randomUUID(); 
 
-    // Busca la preventa vigente por fecha
     const preventaQuery = await pool.query(
       'SELECT * FROM preventas WHERE evento_id = $1 AND sector_id = $2 AND (fecha_limite IS NULL OR fecha_limite >= NOW()) ORDER BY fecha_limite ASC LIMIT 1',
       [evento_id, sector_id]
