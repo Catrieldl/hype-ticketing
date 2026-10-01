@@ -131,7 +131,7 @@
         <form id="staffForm" onkeydown="return event.key != 'Enter';">
             <input type="text" id="nuevoNombre" placeholder="Nombre" required>
             <input type="text" id="nuevoApellido" placeholder="Apellido" required>
-            <input type="text" id="nuevoWhatsapp" placeholder="WhatsApp (Ej: 549112345678)" required>
+            <input type="tel" id="nuevoWhatsapp" inputmode="tel" pattern="[\+0-9]*" value="+549" required>
             <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
             <input type="password" id="nuevoPass" placeholder="Contraseña" required>
             <select id="nuevoRol" onchange="toggleEventoStaff(this.value)">
