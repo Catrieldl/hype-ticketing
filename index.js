@@ -54,12 +54,10 @@ const verificarToken = (req, res, next) => {
 };
 
 app.post('/api/usuarios', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador puede hacer esto' });
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
   try {
     const { email, password, rol, evento_id } = req.body;
     const hash = await bcrypt.hash(password, 10);
-    
-    // Lógica UPSERT: Si el email no existe, lo crea. Si ya existe, actualiza sus datos.
     await pool.query(
       `INSERT INTO usuarios (email, password, rol, evento_id) 
        VALUES ($1, $2, $3, $4)
@@ -67,27 +65,14 @@ app.post('/api/usuarios', verificarToken, async (req, res) => {
        DO UPDATE SET password = EXCLUDED.password, rol = EXCLUDED.rol, evento_id = EXCLUDED.evento_id`, 
       [email, hash, rol, evento_id || null]
     );
-    res.json({ mensaje: 'Usuario guardado/actualizado correctamente' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET opcional para listar usuarios si lo necesitas en el frontend
-app.get('/api/usuarios', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Sin permisos' });
-  try {
-    const usuarios = await pool.query('SELECT id, email, rol, evento_id FROM usuarios');
-    res.json(usuarios.rows);
+    res.json({ mensaje: 'Usuario guardado/actualizado' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/eventos', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
-     return res.status(403).json({ error: 'Sin permisos' });
-  }
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
     const { nombre, fecha } = req.body;
     const nuevoEvento = await pool.query('INSERT INTO eventos (nombre, fecha) VALUES ($1, $2) RETURNING *', [nombre, fecha]);
@@ -107,12 +92,9 @@ app.get('/api/eventos', async (req, res) => {
 });
 
 app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador') {
-     return res.status(403).json({ error: 'Solo Fundador' });
-  }
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo Fundador' });
   try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM eventos WHERE id = $1', [id]);
+    await pool.query('DELETE FROM eventos WHERE id = $1', [req.params.id]);
     res.json({ mensaje: 'Borrado' });
   } catch (err) {
     res.status(500).send('Error');
@@ -120,9 +102,7 @@ app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
 });
 
 app.post('/api/sectores', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
-     return res.status(403).json({ error: 'Sin permisos' });
-  }
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
     const { evento_id, nombre, capacidad } = req.body;
     const nuevoSector = await pool.query(
@@ -137,8 +117,7 @@ app.post('/api/sectores', verificarToken, async (req, res) => {
 
 app.get('/api/sectores/:evento_id', async (req, res) => {
   try {
-    const { evento_id } = req.params;
-    const sectores = await pool.query('SELECT * FROM sectores WHERE evento_id = $1', [evento_id]);
+    const sectores = await pool.query('SELECT * FROM sectores WHERE evento_id = $1', [req.params.evento_id]);
     res.json(sectores.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -146,9 +125,7 @@ app.get('/api/sectores/:evento_id', async (req, res) => {
 });
 
 app.post('/api/preventas', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
-     return res.status(403).json({ error: 'Sin permisos' });
-  }
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
     const { evento_id, sector_id, nombre, precio, fecha_limite } = req.body;
     const nueva = await pool.query(
@@ -163,13 +140,10 @@ app.post('/api/preventas', verificarToken, async (req, res) => {
 
 app.get('/api/preventas/:evento_id', verificarToken, async (req, res) => {
   try {
-    const { evento_id } = req.params;
     const preventas = await pool.query(`
-      SELECT p.*, s.nombre AS sector_nombre 
-      FROM preventas p 
-      JOIN sectores s ON p.sector_id = s.id 
-      WHERE p.evento_id = $1
-    `, [evento_id]);
+      SELECT p.*, s.nombre AS sector_nombre FROM preventas p 
+      JOIN sectores s ON p.sector_id = s.id WHERE p.evento_id = $1
+    `, [req.params.evento_id]);
     res.json(preventas.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -177,15 +151,12 @@ app.get('/api/preventas/:evento_id', verificarToken, async (req, res) => {
 });
 
 app.put('/api/preventas/:id', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
-     return res.status(403).json({ error: 'Sin permisos' });
-  }
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
-    const { id } = req.params;
     const { nombre, precio, fecha_limite } = req.body;
     const actualizada = await pool.query(
       'UPDATE preventas SET nombre = $1, precio = $2, fecha_limite = $3 WHERE id = $4 RETURNING *',
-      [nombre, precio, fecha_limite || null, id]
+      [nombre, precio, fecha_limite || null, req.params.id]
     );
     res.json(actualizada.rows[0]);
   } catch (err) {
@@ -194,28 +165,24 @@ app.put('/api/preventas/:id', verificarToken, async (req, res) => {
 });
 
 app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
-     return res.status(403).json({ error: 'Sin permisos' });
-  }
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM preventas WHERE id = $1', [id]);
+    await pool.query('DELETE FROM preventas WHERE id = $1', [req.params.id]);
     res.json({ mensaje: 'Preventa borrada' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// MODIFICADO: Generación múltiple
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    let { evento_id, sector_id } = req.body;
+    let { evento_id, sector_id, cantidad } = req.body;
     const vendedor_id = req.usuario.id; 
-    const codigo_qr = crypto.randomUUID(); 
+    cantidad = parseInt(cantidad) || 1; // Default a 1 si no manda nada
 
     if (req.usuario.rol === 'Vendedor') {
-      if (!req.usuario.evento_id) {
-        return res.status(403).json({ error: 'El vendedor no tiene un evento asignado por el administrador.' });
-      }
+      if (!req.usuario.evento_id) return res.status(403).json({ error: 'Vendedor sin evento asignado.' });
       evento_id = req.usuario.evento_id;
     }
 
@@ -223,14 +190,11 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     if (sectorData.rows.length === 0) return res.status(400).json({ error: 'Sector no encontrado' });
     const sector = sectorData.rows[0];
 
-    const ticketsVendidosQuery = await pool.query(
-      'SELECT COUNT(*) FROM tickets WHERE evento_id = $1 AND sector = $2',
-      [evento_id, sector.nombre]
-    );
-    const totalVendidos = parseInt(ticketsVendidosQuery.rows[0].count);
+    const ticketsVendidos = await pool.query('SELECT COUNT(*) FROM tickets WHERE evento_id = $1 AND sector = $2', [evento_id, sector.nombre]);
+    const totalVendidos = parseInt(ticketsVendidos.rows[0].count);
 
-    if (totalVendidos >= sector.capacidad) {
-      return res.status(400).json({ error: `El sector ${sector.nombre} ha alcanzado su capacidad máxima (${sector.capacidad} entradas).` });
+    if (totalVendidos + cantidad > sector.capacidad) {
+      return res.status(400).json({ error: `Capacidad excedida. Solo quedan ${sector.capacidad - totalVendidos} lugares.` });
     }
 
     const preventaQuery = await pool.query(
@@ -238,19 +202,22 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
       [evento_id, sector_id]
     );
 
-    if (preventaQuery.rows.length === 0) {
-      return res.status(400).json({ error: 'No hay preventas activas configuradas para este sector' });
-    }
-
+    if (preventaQuery.rows.length === 0) return res.status(400).json({ error: 'No hay preventas activas' });
     const preventaActiva = preventaQuery.rows[0];
 
-    await pool.query(
-      'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
-      [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre]
-    );
+    const linksGenerados = [];
 
-    const linkVenta = `https://hypevenue.up.railway.app/comprar/${codigo_qr}`;
-    res.json({ link: linkVenta, precio: preventaActiva.precio, tanda: preventaActiva.nombre });
+    // Bucle para insertar "n" tickets
+    for(let i = 0; i < cantidad; i++) {
+        const codigo_qr = crypto.randomUUID(); 
+        await pool.query(
+          'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
+          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre]
+        );
+        linksGenerados.push(`https://hypevenue.up.railway.app/comprar/${codigo_qr}`);
+    }
+
+    res.json({ links: linksGenerados, precio: preventaActiva.precio, tanda: preventaActiva.nombre, cantidad });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -258,12 +225,8 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
 
 app.get('/comprar/:codigo', async (req, res) => {
   try {
-    const { codigo } = req.params;
-    const ticketQuery = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [codigo]);
-    
-    if (ticketQuery.rows.length === 0) {
-      return res.status(404).send('<h1>Ticket no encontrado o inválido</h1>');
-    }
+    const ticketQuery = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [req.params.codigo]);
+    if (ticketQuery.rows.length === 0) return res.status(404).send('<h1>Ticket no encontrado o inválido</h1>');
 
     const ticket = ticketQuery.rows[0];
     const eventoQuery = await pool.query('SELECT * FROM eventos WHERE id = $1', [ticket.evento_id]);
@@ -302,6 +265,4 @@ app.get('/comprar/:codigo', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Puerto ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Puerto ${PORT}`));
