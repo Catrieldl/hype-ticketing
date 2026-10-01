@@ -20,13 +20,16 @@
         .btn-borrar { background: #cc0000; color: #fff; width: auto; padding: 6px 12px; margin-left: 5px; }
         .btn-editar { background: #0066cc; color: #fff; width: auto; padding: 6px 12px; }
         .btn-actualizar { background: #00ffcc; color: #000; margin-bottom: 15px; }
-        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas { display: none; }
+        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas, #navVendedor { display: none; }
         .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
         .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
         li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 6px; }
         .stat-badge { background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
         .wa-link { color: #00ffcc; text-decoration: none; font-weight: bold; }
         .wa-link:hover { text-decoration: underline; }
+        .nav-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+        .nav-buttons button { background: #333; color: #fff; }
+        .nav-buttons button.active { background: #00ffcc; color: #000; }
     </style>
 </head>
 <body>
@@ -38,6 +41,14 @@
             <input type="password" id="passLogin" placeholder="Contraseña" required>
             <button type="submit">Entrar</button>
         </form>
+    </div>
+
+    <!-- Navegación para el Vendedor -->
+    <div class="container" id="navVendedor" style="padding: 10px 20px;">
+        <div class="nav-buttons">
+            <button id="btnNavVentas" class="active" onclick="mostrarTab('seccionVentas', 'btnNavVentas')">Generar Venta</button>
+            <button id="btnNavMisVentas" onclick="mostrarTab('seccionMisVentas', 'btnNavMisVentas')">Mis Ventas</button>
+        </div>
     </div>
 
     <div class="container" id="seccionVentas">
@@ -57,6 +68,7 @@
 
     <div class="container" id="seccionMisVentas">
         <h2>Mis Ventas</h2>
+        <button class="btn-actualizar" onclick="cargarMisVentas()">Actualizar Lista</button>
         <div id="resumenMisVentas" style="margin-bottom: 15px;"></div>
         <ul id="listaMisVentas" style="list-style: none; padding: 0;"></ul>
     </div>
@@ -145,6 +157,18 @@
 
         if (token) mostrarDashboard();
 
+        function mostrarTab(idSeccion, idBoton) {
+            document.getElementById('seccionVentas').style.display = 'none';
+            document.getElementById('seccionMisVentas').style.display = 'none';
+            document.getElementById(idSeccion).style.display = 'block';
+            
+            document.getElementById('btnNavVentas').classList.remove('active');
+            document.getElementById('btnNavMisVentas').classList.remove('active');
+            document.getElementById(idBoton).classList.add('active');
+
+            if (idSeccion === 'seccionMisVentas') cargarMisVentas();
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const res = await fetch(`${API_URL}/login`, {
@@ -167,24 +191,23 @@
         function mostrarDashboard() {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('logoutContainer').style.display = 'block';
-            document.getElementById('seccionVentas').style.display = 'block';
             
             if (userRol === 'Fundador' || userRol === 'Admin') {
+                document.getElementById('seccionVentas').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('seccionSectores').style.display = 'block';
                 document.getElementById('seccionPreventas').style.display = 'block';
                 document.getElementById('seccionReportes').style.display = 'block';
                 cargarReportes();
+                cargarEventos();
             }
             if (userRol === 'Fundador') document.getElementById('seccionStaff').style.display = 'block';
             
             if (userRol === 'Vendedor') {
+                document.getElementById('navVendedor').style.display = 'block';
+                document.getElementById('seccionVentas').style.display = 'block';
                 document.getElementById('eventoSelectVentas').style.display = 'none';
-                document.getElementById('seccionMisVentas').style.display = 'block';
                 if (userEventoId) cargarSectoresVentas(userEventoId);
-                cargarMisVentas();
-            } else {
-                cargarEventos();
             }
         }
 
@@ -295,8 +318,7 @@
                         <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
-                if (userRol === 'Vendedor') cargarMisVentas();
-                else cargarReportes(); 
+                if (userRol !== 'Vendedor') cargarReportes(); 
             } else {
                 alert(data.error || 'Error al generar links');
             }
@@ -444,14 +466,14 @@
                 const linkUrl = `https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`;
                 const fechaVenta = v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : 'Fecha no registrada';
                 const badgeColor = v.estado === 'Pagado' ? '#00ffcc' : '#ffaa00';
-                const badgeText = v.estado === 'Pagado' ? '#000' : '#000';
+                const badgeText = '#000';
                 
                 return `<li>
                     <span><strong>${v.sector}</strong> - $${v.precio}<br>
                     <small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Gen: ${fechaVenta}</small></span>
                     <div style="text-align: right;">
                         <span class="stat-badge" style="background:${badgeColor}; color:${badgeText}; margin-bottom: 5px; display: inline-block;">${v.estado}</span><br>
-                        <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Copiar Link</button>
+                        <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px; background: #333; color: #fff;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Link</button>
                     </div>
                 </li>`;
             }).join('');
