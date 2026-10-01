@@ -91,16 +91,15 @@ app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
 // Ruta para generar link de venta
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    const { evento_id, precio } = req.body;
-    const vendedor_id = req.usuario.id; // El sistema sabe qué vendedor está logueado
-    const codigo_qr = crypto.randomUUID(); // Genera un código alfanumérico único
+    const { evento_id, precio, sector } = req.body;
+    const vendedor_id = req.usuario.id; 
+    const codigo_qr = crypto.randomUUID(); 
 
     await pool.query(
-      'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio) VALUES ($1, $2, $3, $4)',
-      [evento_id, vendedor_id, codigo_qr, precio]
+      'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
+      [evento_id, vendedor_id, codigo_qr, precio, sector]
     );
 
-    // Este es el link que el RRPP le va a mandar al cliente por WhatsApp
     const linkVenta = `https://hype-ticketing-production.up.railway.app/comprar/${codigo_qr}`;
     res.json({ link: linkVenta });
   } catch (err) {
