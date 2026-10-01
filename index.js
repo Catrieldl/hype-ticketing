@@ -1,3 +1,5 @@
+const path = require('path'); // Esto hace que Railway sirva el archivo index.html cuando entren a la raíz
+app.use(express.static(path.join(__dirname)));
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
