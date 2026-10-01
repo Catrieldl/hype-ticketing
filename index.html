@@ -53,7 +53,7 @@
         <div id="resultadoLink"></div>
     </div>
 
-    <!-- NUEVA SECCIÓN DE REPORTES -->
+    <!-- SECCIÓN DE REPORTES (Usuarios y Ventas) -->
     <div class="container" id="seccionReportes">
         <h2>Reportes y Usuarios</h2>
         <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
@@ -163,7 +163,7 @@
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('seccionSectores').style.display = 'block';
                 document.getElementById('seccionPreventas').style.display = 'block';
-                document.getElementById('seccionReportes').style.display = 'block'; // Activar panel reportes
+                document.getElementById('seccionReportes').style.display = 'block';
                 cargarReportes();
             }
             if (userRol === 'Fundador') document.getElementById('seccionStaff').style.display = 'block';
@@ -280,6 +280,7 @@
                         <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
+                cargarReportes(); // Actualiza conteo al instante
             } else {
                 alert(data.error || 'Error al generar links');
             }
@@ -301,8 +302,12 @@
             if(confirm('¿Eliminar evento?')) { await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarEventos(); }
         }
 
+        // Modificado: Solo muestra el botón si es Fundador
         async function borrarPreventa(id, evento_id) {
-            if(confirm('¿Eliminar preventa?')) { await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarPreventasAdmin(evento_id); }
+            if(confirm('¿Eliminar preventa?')) { 
+                await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); 
+                cargarPreventasAdmin(evento_id); 
+            }
         }
 
         async function editarPreventa(id, evento_id, n, p, f) {
@@ -346,27 +351,62 @@
             if (!id) return lst.innerHTML = '';
             const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }});
             const prev = await res.json();
-            lst.innerHTML = prev.map(p => `<li><span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span><div><button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button><button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button></div></li>`).join('');
+            
+            // Condición para el botón de borrar preventa
+            lst.innerHTML = prev.map(p => {
+                const btnBorrarPrev = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button>` : '';
+                return `<li>
+                    <span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span>
+                    <div>
+                        <button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button>
+                        ${btnBorrarPrev}
+                    </div>
+                </li>`;
+            }).join('');
         }
 
-        // NUEVAS FUNCIONES PARA REPORTES
+        // CARGA DE REPORTES CON BOTONES SOLO PARA FUNDADOR
         async function cargarReportes() {
             if (userRol !== 'Fundador' && userRol !== 'Admin') return;
             
-            // Cargar Ventas
             const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
             const ventas = await resVentas.json();
-            document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => 
-                `<li><span><strong>${v.email}</strong> (${v.rol})</span>
-                <div><span class="stat-badge">${v.total_tickets} tickets</span> <span class="stat-badge" style="background:#0066cc;">$${v.total_recaudado}</span></div></li>`
-            ).join('');
+            document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
+                const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px; font-size: 11px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
+                return `<li>
+                    <span><strong>${v.email}</strong> (${v.rol})</span>
+                    <div style="text-align: right;">
+                        <span class="stat-badge">${v.total_tickets} tickets</span> 
+                        <span class="stat-badge" style="background:#0066cc;">$${v.total_recaudado}</span>
+                        <br>${btnBorrarVentas}
+                    </div>
+                </li>`;
+            }).join('');
 
-            // Cargar Usuarios y Roles
             const resUsu = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${token}` }});
             const usuarios = await resUsu.json();
-            document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => 
-                `<li><span><strong>${u.email}</strong><br><small style="color:#aaa;">Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span></li>`
-            ).join('');
+            document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
+                const btnBorrarUsu = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>` : '';
+                return `<li>
+                    <span><strong>${u.email}</strong><br><small style="color:#aaa;">Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span>
+                    ${btnBorrarUsu}
+                </li>`;
+            }).join('');
+        }
+
+        // FUNCIONES DE BORRADO DE USUARIO/VENTAS (Solo Fundador)
+        async function borrarUsuario(id) {
+            if(confirm('¿Seguro querés eliminar a este usuario?')) {
+                await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                cargarReportes();
+            }
+        }
+
+        async function borrarVentasVendedor(id) {
+            if(confirm('¿Seguro querés eliminar TODAS las ventas de este vendedor? Los tickets ya generados dejarán de ser válidos.')) {
+                await fetch(`${API_URL}/ventas/vendedor/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                cargarReportes();
+            }
         }
     </script>
 </body>
