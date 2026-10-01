@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner - Hype Venue</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 20px; }
+        h2 { color: #00ffcc; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
+        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid #333; border-radius: 8px; background: #111; }
+        #resultado { margin-top: 20px; padding: 30px 20px; border-radius: 8px; font-size: 22px; font-weight: bold; display: none; text-transform: uppercase; }
+        .valido { background: #00cc66; color: #fff; }
+        .usado { background: #cc0000; color: #fff; }
+        .pendiente { background: #ffaa00; color: #000; }
+        .error { background: #444; color: #fff; }
+        button { background: #fff; color: #000; border: none; padding: 15px 30px; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 20px; cursor: pointer; display: none; width: 100%; max-width: 500px; }
+        button:active { background: #ccc; }
+    </style>
+</head>
+<body>
+    <h2>Control de Puerta</h2>
+    <div id="reader"></div>
+    <div id="resultado"></div>
+    <button id="btnReiniciar" onclick="reiniciar()">Escanear Siguiente</button>
+
+    <script>
+        const API_URL = '/api';
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+        let escaneando = true;
+
+        async function onScanSuccess(decodedText) {
+            if (!escaneando) return;
+            escaneando = false;
+            html5QrcodeScanner.pause();
+            
+            // Extrae el código QR exacto, ya sea que escaneen el UUID suelto o la URL completa de la entrada
+            const codigo = decodedText.split('/').pop();
+            const res = await fetch(`${API_URL}/escanear/${codigo}`);
+            const div = document.getElementById('resultado');
+            
+            div.style.display = 'block';
+            document.getElementById('btnReiniciar').style.display = 'inline-block';
+
+            if (!res.ok) {
+                div.className = 'error'; 
+                div.innerHTML = '❌ ENTRADA NO ENCONTRADA'; 
+                return;
+            }
+
+            const ticket = await res.json();
+
+            if (ticket.estado === 'Pendiente') {
+                div.className = 'pendiente'; 
+                div.innerHTML = `⚠️ FALTA PAGAR<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
+            } else if (ticket.estado === 'Usado') {
+                div.className = 'usado'; 
+                div.innerHTML = `🚫 YA INGRESÓ<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
+            } else if (ticket.estado === 'Pagado') {
+                const resUsar = await fetch(`${API_URL}/escanear/${codigo}/usar`, { method: 'POST' });
+                if (resUsar.ok) {
+                    div.className = 'valido'; 
+                    div.innerHTML = `✅ PASA<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
+                } else {
+                    div.className = 'error'; 
+                    div.innerHTML = '❌ ERROR AL MARCAR INGRESO';
+                }
+            }
+        }
+
+        html5QrcodeScanner.render(onScanSuccess);
+
+        function reiniciar() {
+            document.getElementById('resultado').style.display = 'none';
+            document.getElementById('btnReiniciar').style.display = 'none';
+            escaneando = true;
+            html5QrcodeScanner.resume();
+        }
+    </script>
+</body>
+</html>
