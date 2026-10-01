@@ -4,18 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel - Hype Venue</title>
+    
+    <!-- Tipografía moderna -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: Arial; padding: 20px; background: #f4f4f4; }
-        .container { background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto; margin-bottom: 20px; }
-        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        button { background: #333; color: white; border: none; cursor: pointer; }
-        button:hover { background: #555; }
-        .btn-borrar { background: #cc0000; width: auto; padding: 5px 10px; margin-left: 5px; }
-        .btn-editar { background: #0066cc; width: auto; padding: 5px 10px; }
+        body { font-family: 'Montserrat', sans-serif; padding: 20px; background: #f4f4f4; }
+        .container { background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; font-weight: 700; color: #111; }
+        input, select, button { font-family: 'Montserrat', sans-serif; padding: 12px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        button { background: #111; color: white; border: none; cursor: pointer; font-weight: 600; transition: background 0.3s; }
+        button:hover { background: #333; }
+        .btn-borrar { background: #cc0000; width: auto; padding: 6px 12px; margin-left: 5px; }
+        .btn-editar { background: #0066cc; width: auto; padding: 6px 12px; }
         #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas { display: none; }
-        .error { color: red; }
-        .link-generado { background: #eef; padding: 15px; word-break: break-all; margin-top: 10px; border-left: 4px solid #333; }
-        li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fafafa; padding: 8px; border: 1px solid #ddd; }
+        .error { color: #cc0000; font-weight: 600; margin-bottom: 10px; }
+        .link-generado { background: #f8f9fa; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #111; border-radius: 4px; }
+        li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fafafa; padding: 10px; border: 1px solid #eee; border-radius: 6px; }
     </style>
 </head>
 <body>
@@ -38,9 +45,7 @@
             <select id="sectorSelectVentas" required>
                 <option value="">Primero seleccioná un evento...</option>
             </select>
-            <!-- NUEVO CAMPO CANTIDAD -->
             <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de entradas">
-
             <button type="submit">Generar Link(s) Automático</button>
         </form>
         <div id="resultadoLink"></div>
@@ -53,8 +58,8 @@
             <input type="datetime-local" id="fecha" required>
             <button type="submit">Guardar Evento</button>
         </form>
-        <h3>Eventos Activos</h3>
-        <ul id="listaEventos"></ul>
+        <h3 style="margin-top: 20px;">Eventos Activos</h3>
+        <ul id="listaEventos" style="list-style: none; padding: 0;"></ul>
     </div>
 
     <div class="container" id="seccionSectores">
@@ -80,12 +85,12 @@
             </select>
             <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1" required>
             <input type="number" id="precioPreventa" placeholder="Precio ($)" required>
-            <label style="font-size: 12px; color: #555;">Fecha límite (opcional):</label>
+            <label style="font-size: 12px; color: #555; font-weight: 600;">Fecha límite (opcional):</label>
             <input type="datetime-local" id="fechaLimitePreventa">
             <button type="submit">Guardar Preventa</button>
         </form>
-        <h3>Activas</h3>
-        <ul id="listaPreventasAdmin"></ul>
+        <h3 style="margin-top: 20px;">Activas</h3>
+        <ul id="listaPreventasAdmin" style="list-style: none; padding: 0;"></ul>
     </div>
 
     <div class="container" id="seccionStaff">
@@ -104,7 +109,7 @@
         </form>
     </div>
     
-    <div class="container" id="logoutContainer" style="display:none; text-align: center;">
+    <div class="container" id="logoutContainer" style="display:none; text-align: center; background: transparent; box-shadow: none;">
         <button onclick="cerrarSesion()" style="background: #888; width: 50%;">Cerrar Sesión</button>
     </div>
 
@@ -224,13 +229,16 @@
             toggleEventoStaff('Admin'); 
         }
 
-        // Modificado para recibir array de links y armar el mensaje de WhatsApp grupal
         document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
             const sector_id = document.getElementById('sectorSelectVentas').value;
             const cantidad = document.getElementById('cantidadVentas').value;
             
+            const botonSubmit = e.target.querySelector('button[type="submit"]');
+            botonSubmit.disabled = true;
+            botonSubmit.innerText = 'Generando...';
+
             const res = await fetch(`${API_URL}/tickets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -238,17 +246,21 @@
             });
             const data = await res.json();
             
+            botonSubmit.disabled = false;
+            botonSubmit.innerText = 'Generar Link(s) Automático';
+            
             if (data.links) {
                 const textoLinks = data.links.join('\n\n');
                 const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés los links para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
                 
                 document.getElementById('resultadoLink').innerHTML = `
                     <div class="link-generado">
-                        <p style="margin-top: 0; font-weight: bold;">${data.cantidad} Link(s) listos (${data.tanda})</p>
+                        <p style="margin-top: 0; font-weight: bold; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
                         <div style="display: flex; gap: 10px; margin-top: 15px;">
                             <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #0066cc; flex: 1;">📋 Copiar Link(s)</button>
-                            <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 10px; border-radius: 4px; flex: 1; display: inline-block; font-weight: bold; box-sizing: border-box;">💬 WhatsApp</a>
+                            <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: bold; box-sizing: border-box; font-size: 14px;">💬 WhatsApp</a>
                         </div>
+                        <button type="button" onclick="nuevaVenta()" style="background: #444; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
             } else {
@@ -256,7 +268,12 @@
             }
         });
 
-        // Actualizado para decodificar texto crudo
+        // Función nueva para reiniciar la vista de ventas rápido
+        function nuevaVenta() {
+            document.getElementById('resultadoLink').innerHTML = '';
+            document.getElementById('cantidadVentas').value = 1;
+        }
+
         function copiarLink(textoCodificado) {
             const texto = decodeURIComponent(textoCodificado);
             navigator.clipboard.writeText(texto).then(() => {
