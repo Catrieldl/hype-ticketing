@@ -16,7 +16,6 @@ const pool = new Pool({
 
 const SECRET = process.env.JWT_SECRET || 'hype_venue_secreto_2026';
 
-// Servir la carpeta actual como pública y forzar el index.html en la raíz
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => {
@@ -133,6 +132,54 @@ app.post('/api/preventas', verificarToken, async (req, res) => {
       [evento_id, sector_id, nombre, precio, fecha_limite || null]
     );
     res.json(nueva.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Listar preventas de un evento
+app.get('/api/preventas/:evento_id', verificarToken, async (req, res) => {
+  try {
+    const { evento_id } = req.params;
+    const preventas = await pool.query(`
+      SELECT p.*, s.nombre AS sector_nombre 
+      FROM preventas p 
+      JOIN sectores s ON p.sector_id = s.id 
+      WHERE p.evento_id = $1
+    `, [evento_id]);
+    res.json(preventas.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Actualizar preventa (Precio, Nombre o Fecha Límite)
+app.put('/api/preventas/:id', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
+     return res.status(403).json({ error: 'Sin permisos' });
+  }
+  try {
+    const { id } = req.params;
+    const { nombre, precio, fecha_limite } = req.body;
+    const actualizada = await pool.query(
+      'UPDATE preventas SET nombre = $1, precio = $2, fecha_limite = $3 WHERE id = $4 RETURNING *',
+      [nombre, precio, fecha_limite || null, id]
+    );
+    res.json(actualizada.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Borrar preventa
+app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
+     return res.status(403).json({ error: 'Sin permisos' });
+  }
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM preventas WHERE id = $1', [id]);
+    res.json({ mensaje: 'Preventa borrada' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
