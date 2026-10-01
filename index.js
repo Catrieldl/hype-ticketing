@@ -349,5 +349,34 @@ app.get('/comprar/:codigo', async (req, res) => {
   }
 });
 
+// --- RUTAS PARA ESCÁNER EN PUERTA ---
+app.get('/api/escanear/:codigo', async (req, res) => {
+    try {
+        const query = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [req.params.codigo]);
+        if (query.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado' });
+        res.json(query.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/escanear/:codigo/usar', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "UPDATE tickets SET estado = 'Usado' WHERE codigo_qr = $1 AND estado = 'Pagado' RETURNING *", 
+            [req.params.codigo]
+        );
+        if (result.rows.length === 0) return res.status(400).json({ error: 'El ticket no está Pagado o ya fue Usado' });
+        res.json({ mensaje: 'Acceso autorizado', ticket: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Ruta para servir el archivo del escáner
+app.get('/scanner', (req, res) => {
+    res.sendFile(path.join(__dirname, 'scanner.html'));
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Puerto ${PORT}`));
