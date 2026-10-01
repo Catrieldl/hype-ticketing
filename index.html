@@ -35,12 +35,13 @@
             <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)">
                 <option value="">Seleccioná un evento...</option>
             </select>
-            
             <select id="sectorSelectVentas" required>
                 <option value="">Primero seleccioná un evento...</option>
             </select>
+            <!-- NUEVO CAMPO CANTIDAD -->
+            <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de entradas">
 
-            <button type="submit">Generar Link Automático</button>
+            <button type="submit">Generar Link(s) Automático</button>
         </form>
         <div id="resultadoLink"></div>
     </div>
@@ -69,7 +70,7 @@
     </div>
 
     <div class="container" id="seccionPreventas">
-        <h2>Configurar y Administrar Preventas / Tandas</h2>
+        <h2>Configurar Preventas / Tandas</h2>
         <form id="preventaForm">
             <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value); cargarPreventasAdmin(this.value);">
                 <option value="">Seleccioná un evento...</option>
@@ -77,14 +78,13 @@
             <select id="sectorSelectPreventa" required>
                 <option value="">Primero seleccioná un evento...</option>
             </select>
-            <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1, Early Bird" required>
+            <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1" required>
             <input type="number" id="precioPreventa" placeholder="Precio ($)" required>
-            <label style="font-size: 12px; color: #555;">Fecha límite de vigencia (opcional):</label>
+            <label style="font-size: 12px; color: #555;">Fecha límite (opcional):</label>
             <input type="datetime-local" id="fechaLimitePreventa">
             <button type="submit">Guardar Preventa</button>
         </form>
-
-        <h3>Preventas Activas de este Evento</h3>
+        <h3>Activas</h3>
         <ul id="listaPreventasAdmin"></ul>
     </div>
 
@@ -97,11 +97,9 @@
                 <option value="Admin">Administrador</option>
                 <option value="Vendedor">Vendedor (RRPP)</option>
             </select>
-            
             <select id="eventoSelectStaff" style="display: none;">
                 <option value="">Seleccioná un evento para asignar...</option>
             </select>
-
             <button type="button" onclick="enviarStaffForm()">Crear Usuario</button>
         </form>
     </div>
@@ -127,14 +125,9 @@
             });
             const data = await res.json();
             if (data.token) {
-                token = data.token; 
-                userRol = data.rol;
-                userEventoId = data.evento_id;
-                
-                localStorage.setItem('hype_token', token); 
-                localStorage.setItem('hype_rol', userRol);
+                token = data.token; userRol = data.rol; userEventoId = data.evento_id;
+                localStorage.setItem('hype_token', token); localStorage.setItem('hype_rol', userRol);
                 if(userEventoId) localStorage.setItem('hype_evento_id', userEventoId);
-
                 mostrarDashboard();
             } else {
                 document.getElementById('loginError').innerText = data.error;
@@ -152,23 +145,17 @@
                 document.getElementById('seccionSectores').style.display = 'block';
                 document.getElementById('seccionPreventas').style.display = 'block';
             }
-            if (userRol === 'Fundador') {
-                document.getElementById('seccionStaff').style.display = 'block';
-            }
+            if (userRol === 'Fundador') document.getElementById('seccionStaff').style.display = 'block';
             
             if (userRol === 'Vendedor') {
                 document.getElementById('eventoSelectVentas').style.display = 'none';
-                if (userEventoId) {
-                    cargarSectoresVentas(userEventoId);
-                }
+                if (userEventoId) cargarSectoresVentas(userEventoId);
             } else {
                 cargarEventos();
             }
         }
 
-        function cerrarSesion() {
-            localStorage.clear(); location.reload();
-        }
+        function cerrarSesion() { localStorage.clear(); location.reload(); }
 
         document.getElementById('eventoForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -183,57 +170,38 @@
         document.getElementById('sectorForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const evento_id = document.getElementById('eventoSelectSector').value;
-            const nombre = document.getElementById('nombreSector').value;
-            const capacidad = document.getElementById('capacidadSector').value;
-            
             const res = await fetch(`${API_URL}/sectores`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id, nombre, capacidad })
+                body: JSON.stringify({ evento_id, nombre: document.getElementById('nombreSector').value, capacidad: document.getElementById('capacidadSector').value })
             });
             const data = await res.json();
-            if (data.id) {
-                alert('Sector y aforo creados exitosamente');
-                document.getElementById('sectorForm').reset();
-                cargarEventos();
-            } else {
-                alert(data.error || 'Error al crear sector');
-            }
+            if (data.id) { alert('Sector creado'); document.getElementById('sectorForm').reset(); cargarEventos(); } 
+            else alert(data.error);
         });
 
         document.getElementById('preventaForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const evento_id = document.getElementById('eventoSelectPreventa').value;
-            const sector_id = document.getElementById('sectorSelectPreventa').value;
-            const nombre = document.getElementById('nombrePreventa').value;
-            const precio = document.getElementById('precioPreventa').value;
-            const fecha_limite = document.getElementById('fechaLimitePreventa').value || null;
-            
             const res = await fetch(`${API_URL}/preventas`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id, sector_id, nombre, precio, fecha_limite })
+                body: JSON.stringify({ 
+                    evento_id, sector_id: document.getElementById('sectorSelectPreventa').value, 
+                    nombre: document.getElementById('nombrePreventa').value, 
+                    precio: document.getElementById('precioPreventa').value, 
+                    fecha_limite: document.getElementById('fechaLimitePreventa').value || null 
+                })
             });
             const data = await res.json();
-            if (data.id) {
-                alert('Preventa configurada exitosamente');
-                document.getElementById('preventaForm').reset();
-                cargarPreventasAdmin(evento_id);
-            } else {
-                alert(data.error || 'Error al configurar preventa');
-            }
+            if (data.id) { alert('Preventa creada'); document.getElementById('preventaForm').reset(); cargarPreventasAdmin(evento_id); } 
+            else alert(data.error);
         });
 
         function toggleEventoStaff(rol) {
-            const selector = document.getElementById('eventoSelectStaff');
-            if (rol === 'Vendedor') {
-                selector.style.display = 'block';
-                selector.required = true;
-            } else {
-                selector.style.display = 'none';
-                selector.required = false;
-                selector.value = '';
-            }
+            const sel = document.getElementById('eventoSelectStaff');
+            if (rol === 'Vendedor') { sel.style.display = 'block'; sel.required = true; } 
+            else { sel.style.display = 'none'; sel.required = false; sel.value = ''; }
         }
 
         async function enviarStaffForm() {
@@ -242,157 +210,110 @@
             const rol = document.getElementById('nuevoRol').value;
             const evento_id = document.getElementById('eventoSelectStaff').value;
 
-            if (!email || !password) {
-                alert('Completá email y contraseña');
-                return;
-            }
-
-            if (rol === 'Vendedor' && !evento_id) {
-                alert('Tenés que asignarle un evento al vendedor.');
-                return;
-            }
+            if (!email || !password) return alert('Completá email y contraseña');
+            if (rol === 'Vendedor' && !evento_id) return alert('Asigná un evento al vendedor.');
 
             const res = await fetch(`${API_URL}/usuarios`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ email, password, rol, evento_id: evento_id || null })
             });
-            
             const data = await res.json();
             alert(data.mensaje || data.error);
-            
             document.getElementById('staffForm').reset();
             toggleEventoStaff('Admin'); 
         }
 
+        // Modificado para recibir array de links y armar el mensaje de WhatsApp grupal
         document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
             const sector_id = document.getElementById('sectorSelectVentas').value;
+            const cantidad = document.getElementById('cantidadVentas').value;
             
             const res = await fetch(`${API_URL}/tickets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id, sector_id })
+                body: JSON.stringify({ evento_id, sector_id, cantidad })
             });
             const data = await res.json();
             
-            if (data.link) {
-                const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés el link para comprar tu entrada (${data.tanda} - $${data.precio}): ${data.link}`);
+            if (data.links) {
+                const textoLinks = data.links.join('\n\n');
+                const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés los links para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
                 
                 document.getElementById('resultadoLink').innerHTML = `
                     <div class="link-generado">
-                        <p style="margin-top: 0; font-weight: bold;">Link listo (${data.tanda} - $${data.precio})</p>
+                        <p style="margin-top: 0; font-weight: bold;">${data.cantidad} Link(s) listos (${data.tanda})</p>
                         <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button type="button" onclick="copiarLink('${data.link}')" style="background: #0066cc; flex: 1;">📋 Copiar Link</button>
+                            <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #0066cc; flex: 1;">📋 Copiar Link(s)</button>
                             <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 10px; border-radius: 4px; flex: 1; display: inline-block; font-weight: bold; box-sizing: border-box;">💬 WhatsApp</a>
                         </div>
                     </div>
                 `;
             } else {
-                alert(data.error || 'Error al generar el link');
+                alert(data.error || 'Error al generar links');
             }
         });
 
-        // Función nueva para copiar al portapapeles
-        function copiarLink(link) {
-            navigator.clipboard.writeText(link).then(() => {
-                alert('¡Link copiado!');
-            }).catch(() => {
-                alert('Error al copiar el link');
-            });
+        // Actualizado para decodificar texto crudo
+        function copiarLink(textoCodificado) {
+            const texto = decodeURIComponent(textoCodificado);
+            navigator.clipboard.writeText(texto).then(() => {
+                alert('¡Links copiados!');
+            }).catch(() => alert('Error al copiar'));
         }
 
         async function borrarEvento(id) {
-            if(confirm('¿Seguro querés eliminar este evento?')) {
-                await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-                cargarEventos();
-            }
+            if(confirm('¿Eliminar evento?')) { await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarEventos(); }
         }
 
         async function borrarPreventa(id, evento_id) {
-            if(confirm('¿Seguro querés eliminar esta preventa?')) {
-                await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-                cargarPreventasAdmin(evento_id);
-            }
+            if(confirm('¿Eliminar preventa?')) { await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarPreventasAdmin(evento_id); }
         }
 
-        async function editarPreventa(id, evento_id, nombreActual, precioActual, fechaActual) {
-            const nuevoNombre = prompt("Modificar nombre de la tanda:", nombreActual);
-            if (nuevoNombre === null) return;
-            const nuevoPrecio = prompt("Modificar precio ($):", precioActual);
-            if (nuevoPrecio === null) return;
-            const nuevaFecha = prompt("Modificar fecha límite (YYYY-MM-DD HH:MM o dejar vacío):", fechaActual ? fechaActual.replace('T', ' ').substring(0, 16) : '');
-
+        async function editarPreventa(id, evento_id, n, p, f) {
+            const nn = prompt("Nombre de tanda:", n); if (!nn) return;
+            const np = prompt("Precio ($):", p); if (!np) return;
+            const nf = prompt("Fecha límite (YYYY-MM-DD HH:MM o vacío):", f ? f.replace('T', ' ').substring(0, 16) : '');
             const res = await fetch(`${API_URL}/preventas/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ nombre: nuevoNombre, precio: nuevoPrecio, fecha_limite: nuevaFecha || null })
+                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ nombre: nn, precio: np, fecha_limite: nf || null })
             });
             const data = await res.json();
-            if (data.id) {
-                alert('Preventa actualizada con éxito');
-                cargarPreventasAdmin(evento_id);
-            } else {
-                alert('Error al actualizar');
-            }
+            if (data.id) { alert('Preventa actualizada'); cargarPreventasAdmin(evento_id); } else alert('Error');
         }
 
         async function cargarEventos() {
             const res = await fetch(`${API_URL}/eventos`);
             const eventos = await res.json();
-            
             if (userRol === 'Fundador' || userRol === 'Admin') {
-                document.getElementById('listaEventos').innerHTML = eventos.map(e => {
-                    let btnBorrar = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarEvento(${e.id})">Eliminar</button>` : '';
-                    return `<li><span><strong>${e.nombre}</strong> - ${new Date(e.fecha).toLocaleString()}</span>${btnBorrar}</li>`;
-                }).join('');
+                document.getElementById('listaEventos').innerHTML = eventos.map(e => `<li><span><strong>${e.nombre}</strong> - ${new Date(e.fecha).toLocaleString()}</span>${userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarEvento(${e.id})">Eliminar</button>` : ''}</li>`).join('');
             }
-
-            const options = '<option value="">Seleccioná un evento...</option>' + 
-                eventos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
-
-            document.getElementById('eventoSelectVentas').innerHTML = options;
-            document.getElementById('eventoSelectSector').innerHTML = options;
-            document.getElementById('eventoSelectPreventa').innerHTML = options;
-            document.getElementById('eventoSelectStaff').innerHTML = options; 
+            const opts = '<option value="">Seleccioná un evento...</option>' + eventos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+            ['eventoSelectVentas', 'eventoSelectSector', 'eventoSelectPreventa', 'eventoSelectStaff'].forEach(id => document.getElementById(id).innerHTML = opts);
         }
 
-        async function cargarSectoresVentas(eventoId) {
-            const select = document.getElementById('sectorSelectVentas');
-            if (!eventoId) { select.innerHTML = '<option value="">Primero seleccioná un evento...</option>'; return; }
-            const res = await fetch(`${API_URL}/sectores/${eventoId}`);
-            const sectores = await res.json();
-            select.innerHTML = '<option value="">Seleccioná un sector...</option>' + 
-                sectores.map(s => `<option value="${s.id}">${s.nombre} (Cap: ${s.capacidad})</option>`).join('');
+        async function cargarSectoresVentas(id) {
+            const sel = document.getElementById('sectorSelectVentas');
+            if (!id) return sel.innerHTML = '<option value="">Primero seleccioná un evento...</option>';
+            const res = await fetch(`${API_URL}/sectores/${id}`); const sec = await res.json();
+            sel.innerHTML = '<option value="">Seleccioná un sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre} (Cap: ${s.capacidad})</option>`).join('');
         }
 
-        async function cargarSectoresPreventa(eventoId) {
-            const select = document.getElementById('sectorSelectPreventa');
-            if (!eventoId) { select.innerHTML = '<option value="">Primero seleccioná un evento...</option>'; return; }
-            const res = await fetch(`${API_URL}/sectores/${eventoId}`);
-            const sectores = await res.json();
-            select.innerHTML = '<option value="">Seleccioná un sector...</option>' + 
-                sectores.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+        async function cargarSectoresPreventa(id) {
+            const sel = document.getElementById('sectorSelectPreventa');
+            if (!id) return sel.innerHTML = '<option value="">Primero seleccioná un evento...</option>';
+            const res = await fetch(`${API_URL}/sectores/${id}`); const sec = await res.json();
+            sel.innerHTML = '<option value="">Seleccioná un sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
         }
 
-        async function cargarPreventasAdmin(eventoId) {
-            const lista = document.getElementById('listaPreventasAdmin');
-            if (!eventoId) { lista.innerHTML = ''; return; }
-            const res = await fetch(`${API_URL}/preventas/${eventoId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const preventas = await res.json();
-            
-            lista.innerHTML = preventas.map(p => `
-                <li>
-                    <span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span>
-                    <div>
-                        <button class="btn-editar" onclick="editarPreventa(${p.id}, ${eventoId}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button>
-                        <button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${eventoId})">Borrar</button>
-                    </div>
-                </li>
-            `).join('');
+        async function cargarPreventasAdmin(id) {
+            const lst = document.getElementById('listaPreventasAdmin');
+            if (!id) return lst.innerHTML = '';
+            const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }});
+            const prev = await res.json();
+            lst.innerHTML = prev.map(p => `<li><span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span><div><button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button><button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button></div></li>`).join('');
         }
     </script>
 </body>
