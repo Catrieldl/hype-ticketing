@@ -10,10 +10,12 @@
         input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
         button { background: #333; color: white; border: none; cursor: pointer; }
         button:hover { background: #555; }
-        .btn-borrar { background: #cc0000; width: auto; padding: 5px 10px; margin-left: 10px; }
+        .btn-borrar { background: #cc0000; width: auto; padding: 5px 10px; margin-left: 5px; }
+        .btn-editar { background: #0066cc; width: auto; padding: 5px 10px; }
         #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas { display: none; }
         .error { color: red; }
         .link-generado { background: #eef; padding: 15px; word-break: break-all; margin-top: 10px; font-weight: bold; border-left: 4px solid #333; }
+        li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fafafa; padding: 8px; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -67,9 +69,9 @@
     </div>
 
     <div class="container" id="seccionPreventas">
-        <h2>Configurar Preventas / Tandas de Precios</h2>
+        <h2>Configurar y Administrar Preventas / Tandas</h2>
         <form id="preventaForm">
-            <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value)">
+            <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value); cargarPreventasAdmin(this.value);">
                 <option value="">Seleccioná un evento...</option>
             </select>
             <select id="sectorSelectPreventa" required>
@@ -81,6 +83,9 @@
             <input type="datetime-local" id="fechaLimitePreventa">
             <button type="submit">Guardar Preventa</button>
         </form>
+
+        <h3>Preventas Activas de este Evento</h3>
+        <ul id="listaPreventasAdmin"></ul>
     </div>
 
     <div class="container" id="seccionStaff">
@@ -193,6 +198,7 @@
             if (data.id) {
                 alert('Preventa configurada exitosamente');
                 document.getElementById('preventaForm').reset();
+                cargarPreventasAdmin(evento_id);
             } else {
                 alert(data.error || 'Error al configurar preventa');
             }
@@ -234,9 +240,37 @@
         });
 
         async function borrarEvento(id) {
-            if(confirm('¿Seguro?')) {
+            if(confirm('¿Seguro querés eliminar este evento?')) {
                 await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
                 cargarEventos();
+            }
+        }
+
+        async function borrarPreventa(id, evento_id) {
+            if(confirm('¿Seguro querés eliminar esta preventa?')) {
+                await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                cargarPreventasAdmin(evento_id);
+            }
+        }
+
+        async function editarPreventa(id, evento_id, nombreActual, precioActual, fechaActual) {
+            const nuevoNombre = prompt("Modificar nombre de la tanda:", nombreActual);
+            if (nuevoNombre === null) return;
+            const nuevoPrecio = prompt("Modificar precio ($):", precioActual);
+            if (nuevoPrecio === null) return;
+            const nuevaFecha = prompt("Modificar fecha límite (YYYY-MM-DD HH:MM o dejar vacío):", fechaActual ? fechaActual.replace('T', ' ').substring(0, 16) : '');
+
+            const res = await fetch(`${API_URL}/preventas/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ nombre: nuevoNombre, precio: nuevoPrecio, fecha_limite: nuevaFecha || null })
+            });
+            const data = await res.json();
+            if (data.id) {
+                alert('Preventa actualizada con éxito');
+                cargarPreventasAdmin(evento_id);
+            } else {
+                alert('Error al actualizar');
             }
         }
 
@@ -275,6 +309,25 @@
             const sectores = await res.json();
             select.innerHTML = '<option value="">Seleccioná un sector...</option>' + 
                 sectores.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+        }
+
+        async function cargarPreventasAdmin(eventoId) {
+            const lista = document.getElementById('listaPreventasAdmin');
+            if (!eventoId) { lista.innerHTML = ''; return; }
+            const res = await fetch(`${API_URL}/preventas/${eventoId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const preventas = await res.json();
+            
+            lista.innerHTML = preventas.map(p => `
+                <li>
+                    <span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span>
+                    <div>
+                        <button class="btn-editar" onclick="editarPreventa(${p.id}, ${eventoId}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button>
+                        <button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${eventoId})">Borrar</button>
+                    </div>
+                </li>
+            `).join('');
         }
     </script>
 </body>
