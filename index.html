@@ -25,6 +25,8 @@
         .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
         li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 6px; }
         .stat-badge { background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .wa-link { color: #00ffcc; text-decoration: none; font-weight: bold; }
+        .wa-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -53,7 +55,6 @@
         <div id="resultadoLink"></div>
     </div>
 
-    <!-- SECCIÓN DE REPORTES (Usuarios y Ventas) -->
     <div class="container" id="seccionReportes">
         <h2>Reportes y Usuarios</h2>
         <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
@@ -110,6 +111,9 @@
     <div class="container" id="seccionStaff">
         <h2>Staff</h2>
         <form id="staffForm" onkeydown="return event.key != 'Enter';">
+            <input type="text" id="nuevoNombre" placeholder="Nombre" required>
+            <input type="text" id="nuevoApellido" placeholder="Apellido" required>
+            <input type="text" id="nuevoWhatsapp" placeholder="WhatsApp (Ej: 549112345678)" required>
             <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
             <input type="password" id="nuevoPass" placeholder="Contraseña" required>
             <select id="nuevoRol" onchange="toggleEventoStaff(this.value)">
@@ -226,18 +230,21 @@
         }
 
         async function enviarStaffForm() {
+            const nombre = document.getElementById('nuevoNombre').value;
+            const apellido = document.getElementById('nuevoApellido').value;
+            const whatsapp = document.getElementById('nuevoWhatsapp').value;
             const email = document.getElementById('nuevoEmail').value;
             const password = document.getElementById('nuevoPass').value;
             const rol = document.getElementById('nuevoRol').value;
             const evento_id = document.getElementById('eventoSelectStaff').value;
 
-            if (!email || !password) return alert('Completá email y contraseña');
+            if (!email || !password || !nombre || !apellido || !whatsapp) return alert('Completá todos los campos');
             if (rol === 'Vendedor' && !evento_id) return alert('Asigná un evento al vendedor.');
 
             const res = await fetch(`${API_URL}/usuarios`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ email, password, rol, evento_id: evento_id || null })
+                body: JSON.stringify({ email, password, rol, evento_id: evento_id || null, nombre, apellido, whatsapp })
             });
             const data = await res.json();
             alert(data.mensaje || data.error);
@@ -280,7 +287,7 @@
                         <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
-                cargarReportes(); // Actualiza conteo al instante
+                cargarReportes(); 
             } else {
                 alert(data.error || 'Error al generar links');
             }
@@ -302,7 +309,6 @@
             if(confirm('¿Eliminar evento?')) { await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarEventos(); }
         }
 
-        // Modificado: Solo muestra el botón si es Fundador
         async function borrarPreventa(id, evento_id) {
             if(confirm('¿Eliminar preventa?')) { 
                 await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); 
@@ -352,7 +358,6 @@
             const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }});
             const prev = await res.json();
             
-            // Condición para el botón de borrar preventa
             lst.innerHTML = prev.map(p => {
                 const btnBorrarPrev = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button>` : '';
                 return `<li>
@@ -365,7 +370,6 @@
             }).join('');
         }
 
-        // CARGA DE REPORTES CON BOTONES SOLO PARA FUNDADOR
         async function cargarReportes() {
             if (userRol !== 'Fundador' && userRol !== 'Admin') return;
             
@@ -373,8 +377,11 @@
             const ventas = await resVentas.json();
             document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
                 const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px; font-size: 11px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
+                const nombreCompleto = v.nombre ? `${v.nombre} ${v.apellido}` : v.email;
+                const linkWa = v.whatsapp ? `<a href="https://wa.me/${v.whatsapp}" class="wa-link" target="_blank">${v.whatsapp}</a>` : 'N/A';
+                
                 return `<li>
-                    <span><strong>${v.email}</strong> (${v.rol})</span>
+                    <span><strong>${nombreCompleto}</strong> (${v.rol})<br><small style="color:#aaa;">WA: ${linkWa}</small></span>
                     <div style="text-align: right;">
                         <span class="stat-badge">${v.total_tickets} tickets</span> 
                         <span class="stat-badge" style="background:#0066cc;">$${v.total_recaudado}</span>
@@ -387,14 +394,16 @@
             const usuarios = await resUsu.json();
             document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
                 const btnBorrarUsu = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>` : '';
+                const nombreCompleto = u.nombre ? `${u.nombre} ${u.apellido}` : u.email;
+                const linkWa = u.whatsapp ? `<a href="https://wa.me/${u.whatsapp}" class="wa-link" target="_blank">${u.whatsapp}</a>` : 'N/A';
+
                 return `<li>
-                    <span><strong>${u.email}</strong><br><small style="color:#aaa;">Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span>
+                    <span><strong>${nombreCompleto}</strong><br><small style="color:#aaa;">Email: ${u.email} | WA: ${linkWa} | Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span>
                     ${btnBorrarUsu}
                 </li>`;
             }).join('');
         }
 
-        // FUNCIONES DE BORRADO DE USUARIO/VENTAS (Solo Fundador)
         async function borrarUsuario(id) {
             if(confirm('¿Seguro querés eliminar a este usuario?')) {
                 await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
