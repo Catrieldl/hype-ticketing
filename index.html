@@ -49,8 +49,8 @@
             <select id="sectorSelectVentas" required>
                 <option value="">Primero seleccioná un evento...</option>
             </select>
-            <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de entradas">
-            <button type="submit">Generar Link(s)</button>
+            <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de links a generar">
+            <button type="submit">Generar Link(s) de Pago</button>
         </form>
         <div id="resultadoLink"></div>
     </div>
@@ -65,7 +65,7 @@
         <h2>Reportes y Usuarios</h2>
         <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
         
-        <h3 style="margin-top: 20px;">Ventas por Vendedor</h3>
+        <h3 style="margin-top: 20px;">Ventas por Vendedor (Solo Pagados)</h3>
         <ul id="listaVentasAdmin" style="list-style: none; padding: 0;"></ul>
         
         <h3 style="margin-top: 20px;">Lista de Usuarios</h3>
@@ -279,11 +279,11 @@
             const data = await res.json();
             
             botonSubmit.disabled = false;
-            botonSubmit.innerText = 'Generar Link(s)';
+            botonSubmit.innerText = 'Generar Link(s) de Pago';
             
             if (data.links) {
                 const textoLinks = data.links.join('\n\n');
-                const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés los links para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
+                const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés los links de pago para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
                 
                 document.getElementById('resultadoLink').innerHTML = `
                     <div class="link-generado">
@@ -295,11 +295,8 @@
                         <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                     </div>
                 `;
-                if (userRol === 'Vendedor') {
-                    cargarMisVentas();
-                } else {
-                    cargarReportes(); 
-                }
+                if (userRol === 'Vendedor') cargarMisVentas();
+                else cargarReportes(); 
             } else {
                 alert(data.error || 'Error al generar links');
             }
@@ -395,8 +392,8 @@
                 return `<li>
                     <span><strong>${nombreCompleto}</strong> (${v.rol})<br><small style="color:#aaa;">WA: ${linkWa}</small></span>
                     <div style="text-align: right;">
-                        <span class="stat-badge">${v.total_tickets} tickets</span> 
-                        <span class="stat-badge" style="background:#0066cc;">$${v.total_recaudado}</span>
+                        <span class="stat-badge">${v.total_tickets} tickets pagados</span> 
+                        <span class="stat-badge" style="background:#00ffcc; color:#000;">$${v.total_recaudado}</span>
                         <br>${btnBorrarVentas}
                     </div>
                 </li>`;
@@ -434,22 +431,28 @@
             const res = await fetch(`${API_URL}/mis-ventas`, { headers: { 'Authorization': `Bearer ${token}` } });
             const ventas = await res.json();
             
-            const totalTickets = ventas.length;
-            const totalRecaudado = ventas.reduce((acc, v) => acc + Number(v.precio), 0);
+            const ticketsPagados = ventas.filter(v => v.estado === 'Pagado');
+            const totalTickets = ticketsPagados.length;
+            const totalRecaudado = ticketsPagados.reduce((acc, v) => acc + Number(v.precio), 0);
             
             document.getElementById('resumenMisVentas').innerHTML = `
-                <span class="stat-badge" style="background:#333;">${totalTickets} tickets vendidos</span> 
+                <span class="stat-badge" style="background:#333;">${totalTickets} pagados</span> 
                 <span class="stat-badge" style="background:#00ffcc; color:#000;">Total: $${totalRecaudado}</span>
             `;
             
             document.getElementById('listaMisVentas').innerHTML = ventas.map((v) => {
                 const linkUrl = `https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`;
                 const fechaVenta = v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : 'Fecha no registrada';
+                const badgeColor = v.estado === 'Pagado' ? '#00ffcc' : '#ffaa00';
+                const badgeText = v.estado === 'Pagado' ? '#000' : '#000';
                 
                 return `<li>
                     <span><strong>${v.sector}</strong> - $${v.precio}<br>
-                    <small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Venta: ${fechaVenta}</small></span>
-                    <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Copiar</button>
+                    <small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Gen: ${fechaVenta}</small></span>
+                    <div style="text-align: right;">
+                        <span class="stat-badge" style="background:${badgeColor}; color:${badgeText}; margin-bottom: 5px; display: inline-block;">${v.estado}</span><br>
+                        <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Copiar Link</button>
+                    </div>
                 </li>`;
             }).join('');
         }
