@@ -1,15 +1,15 @@
-const path = require('path'); // Esto hace que Railway sirva el archivo index.html cuando entren a la raíz
-app.use(express.static(path.join(__dirname)));
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const path = require('path'); // Esto hace que Railway sirva el archivo index.html cuando entren a la raíz
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname)));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
