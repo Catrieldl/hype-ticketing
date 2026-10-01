@@ -55,7 +55,6 @@
         <div id="resultadoLink"></div>
     </div>
 
-    <!-- NUEVA SECCIÓN DE VENTAS DETALLADAS PARA EL VENDEDOR -->
     <div class="container" id="seccionMisVentas">
         <h2>Mis Ventas</h2>
         <div id="resumenMisVentas" style="margin-bottom: 15px;"></div>
@@ -445,8 +444,11 @@
             
             document.getElementById('listaMisVentas').innerHTML = ventas.map((v) => {
                 const linkUrl = `https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`;
+                const fechaVenta = v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : 'Fecha no registrada';
+                
                 return `<li>
-                    <span><strong>${v.sector}</strong> - $${v.precio}<br><small style="color:#aaa;">Evento: ${v.evento || 'N/A'}</small></span>
+                    <span><strong>${v.sector}</strong> - $${v.precio}<br>
+                    <small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Venta: ${fechaVenta}</small></span>
                     <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Copiar</button>
                 </li>`;
             }).join('');
