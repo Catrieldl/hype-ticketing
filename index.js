@@ -41,7 +41,6 @@ const verificarToken = (req, res, next) => {
   });
 };
 
-// NUEVO: Crear usuarios (Solo Fundador)
 app.post('/api/usuarios', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador puede hacer esto' });
   try {
@@ -67,34 +66,6 @@ app.post('/api/eventos', verificarToken, async (req, res) => {
   }
 });
 
-// Crear sector para un evento (Solo Fundador/Admin)
-app.post('/api/sectores', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
-     return res.status(403).json({ error: 'Sin permisos' });
-  }
-  try {
-    const { evento_id, nombre } = req.body;
-    const nuevoSector = await pool.query(
-      'INSERT INTO sectores (evento_id, nombre) VALUES ($1, $2) RETURNING *',
-      [evento_id, nombre]
-    );
-    res.json(nuevoSector.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Listar sectores por evento
-app.get('/api/sectores/:evento_id', async (req, res) => {
-  try {
-    const { evento_id } = req.params;
-    const sectores = await pool.query('SELECT * FROM sectores WHERE evento_id = $1', [evento_id]);
-    res.json(sectores.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.get('/api/eventos', async (req, res) => {
   try {
     const todosLosEventos = await pool.query('SELECT * FROM eventos ORDER BY fecha ASC');
@@ -116,24 +87,83 @@ app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
     res.status(500).send('Error');
   }
 });
-// Ruta para generar link de venta
-app.post('/api/tickets', verificarToken, async (req, res) => {
+
+app.post('/api/sectores', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
+     return res.status(403).json({ error: 'Sin permisos' });
+  }
   try {
-    const { evento_id, precio, sector } = req.body;
-    const vendedor_id = req.usuario.id; 
-    const codigo_qr = crypto.randomUUID(); 
-
-    await pool.query(
-      'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
-      [evento_id, vendedor_id, codigo_qr, precio, sector]
+    const { evento_id, nombre } = req.body;
+    const nuevoSector = await pool.query(
+      'INSERT INTO sectores (evento_id, nombre) VALUES ($1, $2) RETURNING *',
+      [evento_id, nombre]
     );
-
-    const linkVenta = `https://hype-ticketing-production.up.railway.app/comprar/${codigo_qr}`;
-    res.json({ link: linkVenta });
+    res.json(nuevoSector.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/api/sectores/:evento_id', async (req, res) => {
+  try {
+    const { evento_id } = req.params;
+    const sectores = await pool.query('SELECT * FROM sectores WHERE evento_id = $1', [evento_id]);
+    res.json(sectores.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Crear Preventa / Tanda de precios
+app.post('/api/preventas', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
+     return res.status(403).json({ error: 'Sin permisos' });
+  }
+  try {
+    const { evento_id, sector_id, nombre, precio, fecha_limite } = req.body;
+    const nueva = await pool.query(
+      'INSERT INTO preventas (evento_id, sector_id, nombre, precio, fecha_limite) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [evento_id, sector_id, nombre, precio, fecha_limite || null]
+    );
+    res.json(nueva.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generar Ticket con Precio Automático según Preventa Activa
+app.post('/api/tickets', verificarToken, async (req, res) => {
+  try {
+    const { evento_id, sector_id } = req.body;
+    const vendedor_id = req.usuario.id; 
+    const codigo_qr = crypto.randomUUID(); 
+
+    // Busca la preventa vigente por fecha
+    const preventaQuery = await pool.query(
+      'SELECT * FROM preventas WHERE evento_id = $1 AND sector_id = $2 AND (fecha_limite IS NULL OR fecha_limite >= NOW()) ORDER BY fecha_limite ASC LIMIT 1',
+      [evento_id, sector_id]
+    );
+
+    if (preventaQuery.rows.length === 0) {
+      return res.status(400).json({ error: 'No hay preventas activas configuradas para este sector' });
+    }
+
+    const preventaActiva = preventaQuery.rows[0];
+    const sectorData = await pool.query('SELECT nombre FROM sectores WHERE id = $1', [sector_id]);
+    const nombreSector = sectorData.rows[0] ? sectorData.rows[0].nombre : 'General';
+
+    await pool.query(
+      'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
+      [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, nombreSector]
+    );
+
+    const linkVenta = `https://hype-ticketing-production.up.railway.app/comprar/${codigo_qr}`;
+    res.json({ link: linkVenta, precio: preventaActiva.precio, tanda: preventaActiva.nombre });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Puerto ${PORT}`);
