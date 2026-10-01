@@ -66,7 +66,6 @@ app.post('/api/eventos', verificarToken, async (req, res) => {
   }
 });
 
-// Devuelve solo eventos futuros (vigentes) para los selectores operativos
 app.get('/api/eventos', async (req, res) => {
   try {
     const todosLosEventos = await pool.query('SELECT * FROM eventos WHERE fecha >= NOW() ORDER BY fecha ASC');
@@ -89,15 +88,16 @@ app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
   }
 });
 
+// Crear Sector con Capacidad / Aforo
 app.post('/api/sectores', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') {
      return res.status(403).json({ error: 'Sin permisos' });
   }
   try {
-    const { evento_id, nombre } = req.body;
+    const { evento_id, nombre, capacidad } = req.body;
     const nuevoSector = await pool.query(
-      'INSERT INTO sectores (evento_id, nombre) VALUES ($1, $2) RETURNING *',
-      [evento_id, nombre]
+      'INSERT INTO sectores (evento_id, nombre, capacidad) VALUES ($1, $2, $3) RETURNING *',
+      [evento_id, nombre, capacidad]
     );
     res.json(nuevoSector.rows[0]);
   } catch (err) {
@@ -131,12 +131,30 @@ app.post('/api/preventas', verificarToken, async (req, res) => {
   }
 });
 
+// Generar Ticket controlando el Aforo del Sector
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
     const { evento_id, sector_id } = req.body;
     const vendedor_id = req.usuario.id; 
     const codigo_qr = crypto.randomUUID(); 
 
+    // 1. Verificar capacidad del sector
+    const sectorData = await pool.query('SELECT * FROM sectores WHERE id = $1', [sector_id]);
+    if (sectorData.rows.length === 0) return res.status(400).json({ error: 'Sector no encontrado' });
+    const sector = sectorData.rows[0];
+
+    // Contar cuántos tickets ya se emitieron para este sector
+    const ticketsVendidosQuery = await pool.query(
+      'SELECT COUNT(*) FROM tickets WHERE evento_id = $1 AND sector = $2',
+      [evento_id, sector.nombre]
+    );
+    const totalVendidos = parseInt(ticketsVendidosQuery.rows[0].count);
+
+    if (totalVendidos >= sector.capacidad) {
+      return res.status(400).json({ error: `El sector ${sector.nombre} ha alcanzado su capacidad máxima (${sector.capacidad} entradas).` });
+    }
+
+    // 2. Buscar preventa activa
     const preventaQuery = await pool.query(
       'SELECT * FROM preventas WHERE evento_id = $1 AND sector_id = $2 AND (fecha_limite IS NULL OR fecha_limite >= NOW()) ORDER BY fecha_limite ASC LIMIT 1',
       [evento_id, sector_id]
@@ -147,12 +165,11 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     }
 
     const preventaActiva = preventaQuery.rows[0];
-    const sectorData = await pool.query('SELECT nombre FROM sectores WHERE id = $1', [sector_id]);
-    const nombreSector = sectorData.rows[0] ? sectorData.rows[0].nombre : 'General';
 
+    // 3. Crear el ticket
     await pool.query(
       'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector) VALUES ($1, $2, $3, $4, $5)',
-      [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, nombreSector]
+      [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre]
     );
 
     const linkVenta = `https://hype-ticketing-production.up.railway.app/comprar/${codigo_qr}`;
