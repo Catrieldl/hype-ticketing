@@ -191,20 +191,27 @@ app.post('/api/iniciar-pago', async (req, res) => {
       
       const ticket = ticketQ.rows[0];
 
-      // 1. Obtener Token de autorización de Nave
-      const tokenRes = await axios.post('ACA_VA_LA_URL_DE_AUTH_DE_NAVE', {
+      // 1. Obtener Token de autorización de Nave (Sandbox)
+      const tokenRes = await axios.post('https://homoservices.apinaranja.com/security-ms/api/security/auth0/b2b/m2mPrivate', {
           client_id: process.env.NAVE_CLIENT_ID,
           client_secret: process.env.NAVE_CLIENT_SECRET,
+          audience: "https://api.ranty.io", // Chequeá en tus credenciales si este valor es distinto
           grant_type: 'client_credentials'
       });
       const accessToken = tokenRes.data.access_token;
 
-      // 2. Crear la orden y generar el link de pago
-      const checkoutRes = await axios.post('ACA_VA_LA_URL_DE_CHECKOUT_DE_NAVE', {
-          amount: ticket.precio,
-          external_reference: ticket.codigo_qr,
-          pos_id: process.env.NAVE_POS_ID,
-          notification_url: 'https://hypevenue.up.railway.app/api/webhooks/nave' // Tu webhook
+      // 2. Crear la orden y generar el link de pago (Sandbox)
+      const checkoutRes = await axios.post('https://api-sandbox.ranty.io/integrations/payment_requests/ecommerce', {
+          external_payment_id: ticket.codigo_qr,
+          seller: {
+              pos_id: process.env.NAVE_POS_ID
+          },
+          transaction: {
+              amount: {
+                  currency: "ARS",
+                  value: ticket.precio
+              }
+          }
       }, {
           headers: { 
               'Authorization': `Bearer ${accessToken}`,
@@ -213,7 +220,7 @@ app.post('/api/iniciar-pago', async (req, res) => {
       });
 
       // Redirigir al cliente al link de pago real de Nave
-      res.json({ url: checkoutRes.data.init_point }); // "init_point" o "url", dependiendo de cómo lo devuelva Nave
+      res.json({ url: checkoutRes.data.checkout_url }); // Nave devuelve la url en "checkout_url"
   } catch (err) {
       console.error('Error con Nave:', err.response ? err.response.data : err.message);
       res.status(500).json({ error: 'Error al procesar el pago con el servidor.' });
