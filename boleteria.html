@@ -5,19 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Boletería - Hype Venue</title>
     <style>
-        /* ESTILOS DE PANTALLA (Para el cajero) */
+        /* ESTILOS DE PANTALLA */
         body { font-family: Arial, sans-serif; background: #000; color: #fff; padding: 20px; text-align: center; }
         .container { background: #111; padding: 30px; border-radius: 8px; max-width: 400px; margin: auto; border: 1px solid #333; }
-        h2 { color: #00ffcc; text-transform: uppercase; letter-spacing: 2px; }
+        h2 { color: #00ffcc; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+        .subtitulo { font-size: 12px; color: #aaa; margin-bottom: 20px; }
         select, button { width: 100%; padding: 15px; margin-top: 15px; border-radius: 6px; font-size: 16px; font-weight: bold; }
         select { background: #222; color: #fff; border: 1px solid #444; }
         button { background: #00ffcc; color: #000; border: none; cursor: pointer; }
         button:active { background: #00cc99; }
         button:disabled { background: #555; cursor: not-allowed; }
+        .btn-salir { background: #444; color: #fff; margin-top: 25px; font-size: 14px; padding: 10px; }
         
         #ticketImpresion { display: none; }
 
-        /* ESTILOS DE IMPRESIÓN (Exclusivo para ticketera 80mm) */
+        /* ESTILOS DE IMPRESIÓN (Para 80mm) */
         @media print {
             body * { visibility: hidden; }
             #ticketImpresion, #ticketImpresion * { visibility: visible; }
@@ -26,14 +28,14 @@
                 position: absolute; 
                 left: 0; 
                 top: 0; 
-                width: 72mm; /* Ancho imprimible exacto de 80mm */
+                width: 72mm; 
                 margin: 0; 
                 padding: 0; 
                 font-family: 'Courier New', monospace; 
                 color: #000; 
                 text-align: center; 
             }
-            @page { margin: 0; } /* Saca los márgenes de Windows */
+            @page { margin: 0; } 
             .print-title { font-size: 22px; font-weight: bold; margin: 10px 0 5px 0; }
             .print-text { font-size: 14px; margin: 3px 0; }
             .print-qr { width: 50mm; height: 50mm; margin: 10px auto; display: block; }
@@ -44,23 +46,28 @@
 <body>
 
     <div class="container">
-        <h2>CAJA / BOLETERÍA</h2>
-        <select id="eventoSelect" onchange="cargarSectores(this.value)">
-            <option value="">Cargando eventos...</option>
+        <h2>BOLETERÍA</h2>
+        <div class="subtitulo" id="nombreEventoTitle">Cargando...</div>
+        
+        <select id="eventoSelect" onchange="cargarSectores(this.value)" style="display: none;">
+            <option value="">Seleccioná un evento...</option>
         </select>
+        
         <select id="sectorSelect">
-            <option value="">Primero seleccioná un evento...</option>
+            <option value="">Seleccioná un sector...</option>
         </select>
         
         <button id="btnImprimir" onclick="generarVenta()">Cobrar e Imprimir Ticket</button>
         <div id="mensaje" style="margin-top: 15px; color: #aaa; font-size: 14px;"></div>
+        
+        <button class="btn-salir" onclick="cerrarSesion()">Cerrar Sesión</button>
     </div>
 
-    <!-- ESTE DIV SOLO SE VE EN EL PAPEL TÉRMICO -->
+    <!-- TICKET TÉRMICO -->
     <div id="ticketImpresion">
         <div class="print-title">HYPE VENUE</div>
         <div class="print-text" id="printEvento">Evento</div>
-        <div class="print-text">Sector: <strong id="printSector">VIP</strong></div>
+        <div class="print-text">Sector: <strong id="printSector">-</strong></div>
         <div class="print-text">Valor: $<span id="printPrecio">0</span></div>
         <img id="printQrImg" class="print-qr" src="" alt="QR">
         <div class="print-footer">
@@ -68,23 +75,49 @@
             Presentar en puerta para escanear.<br>
             Generado: <span id="printFecha"></span>
         </div>
-        <!-- Espacio en blanco para que la guillotina corte bien -->
         <br><br><br>
     </div>
 
     <script>
         const API_URL = '/api';
         let token = localStorage.getItem('hype_token');
+        let userRol = localStorage.getItem('hype_rol');
+        let userEventoId = localStorage.getItem('hype_evento_id');
 
         if (!token) {
-            alert('Tenés que iniciar sesión en el panel primero.');
             window.location.href = '/';
+        }
+
+        async function init() {
+            if (userRol === 'Boleteria') {
+                document.getElementById('eventoSelect').style.display = 'none';
+                if (userEventoId) {
+                    await cargarInfoEvento(userEventoId);
+                    cargarSectores(userEventoId);
+                } else {
+                    document.getElementById('nombreEventoTitle').innerText = 'No tenés evento asignado.';
+                }
+            } else {
+                document.getElementById('eventoSelect').style.display = 'block';
+                cargarEventos();
+                document.getElementById('nombreEventoTitle').innerText = 'Modo Administrador';
+            }
+        }
+
+        async function cargarInfoEvento(id) {
+            const res = await fetch(`${API_URL}/eventos`);
+            const eventos = await res.json();
+            const ev = eventos.find(e => e.id == id);
+            if(ev) {
+                document.getElementById('nombreEventoTitle').innerText = ev.nombre;
+                window.nombreEventoAsignado = ev.nombre;
+            }
         }
 
         async function cargarEventos() {
             const res = await fetch(`${API_URL}/eventos`);
             const eventos = await res.json();
-            document.getElementById('eventoSelect').innerHTML = '<option value="">Seleccioná un evento...</option>' + 
+            document.getElementById('eventoSelect').innerHTML = '<option value="">Cambiar evento...</option>' + 
                 eventos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
         }
 
@@ -97,10 +130,10 @@
         }
 
         async function generarVenta() {
-            const evento_id = document.getElementById('eventoSelect').value;
+            const evento_id = (userRol === 'Boleteria') ? userEventoId : document.getElementById('eventoSelect').value;
             const sector_id = document.getElementById('sectorSelect').value;
             
-            if(!evento_id || !sector_id) return alert('Seleccioná evento y sector.');
+            if(!evento_id || !sector_id) return alert('Verificá evento y sector.');
 
             const btn = document.getElementById('btnImprimir');
             const msg = document.getElementById('mensaje');
@@ -108,7 +141,6 @@
             msg.innerText = "Generando ticket...";
 
             try {
-                // pago_manual en true lo marca como "Pagado" directo. Sin email, no manda Brevo.
                 const res = await fetch(`${API_URL}/tickets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -118,12 +150,16 @@
                 const data = await res.json();
                 
                 if (data.links && data.links.length > 0) {
-                    // Extraer el UUID del QR generado
                     const codigo_qr = data.links[0].split('/').pop();
                     
-                    // Llenar los datos del ticket térmico
-                    const nombreEvento = document.getElementById('eventoSelect').options[document.getElementById('eventoSelect').selectedIndex].text;
-                    const nombreSector = document.getElementById('sectorSelect').options[document.getElementById('sectorSelect').selectedIndex].text.split('(')[0];
+                    let nombreEvento = window.nombreEventoAsignado;
+                    if (userRol !== 'Boleteria') {
+                        const evtSel = document.getElementById('eventoSelect');
+                        nombreEvento = evtSel.options[evtSel.selectedIndex].text;
+                    }
+
+                    const secSel = document.getElementById('sectorSelect');
+                    const nombreSector = secSel.options[secSel.selectedIndex].text.split('(')[0];
                     
                     document.getElementById('printEvento').innerText = nombreEvento;
                     document.getElementById('printSector').innerText = nombreSector;
@@ -132,7 +168,6 @@
                     const fechaActual = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
                     document.getElementById('printFecha').innerText = fechaActual;
 
-                    // Cargar imagen QR y lanzar impresión cuando termine
                     const imgQr = document.getElementById('printQrImg');
                     imgQr.onload = function() {
                         msg.innerText = "¡Impreso exitosamente!";
@@ -140,22 +175,24 @@
                         btn.disabled = false;
                         setTimeout(() => { msg.innerText = ""; }, 3000);
                     };
-                    // Forzar recarga de imagen si la cachea
                     imgQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${codigo_qr}&t=${Date.now()}`;
 
                 } else {
                     alert(data.error || 'Error al generar venta');
-                    btn.disabled = false;
-                    msg.innerText = "";
+                    btn.disabled = false; msg.innerText = "";
                 }
             } catch (err) {
                 alert("Error de conexión");
-                btn.disabled = false;
-                msg.innerText = "";
+                btn.disabled = false; msg.innerText = "";
             }
         }
 
-        cargarEventos();
+        function cerrarSesion() {
+            localStorage.clear();
+            window.location.href = '/';
+        }
+
+        init();
     </script>
 </body>
 </html>
