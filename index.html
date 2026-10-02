@@ -164,6 +164,7 @@
         let userRol = localStorage.getItem('hype_rol');
         let userEventoId = localStorage.getItem('hype_evento_id');
 
+        // ACÁ ESTÁ LA PRIMERA CORRECCIÓN
         if (token) {
             if (userRol === 'Boleteria') window.location.href = '/boleteria';
             else mostrarDashboard();
@@ -189,10 +190,13 @@
                 body: JSON.stringify({ email: document.getElementById('emailLogin').value, password: document.getElementById('passLogin').value })
             });
             const data = await res.json();
+            
+            // ACÁ ESTÁ LA SEGUNDA CORRECCIÓN
             if (data.token) {
                 token = data.token; userRol = data.rol; userEventoId = data.evento_id;
                 localStorage.setItem('hype_token', token); localStorage.setItem('hype_rol', userRol);
                 if(userEventoId) localStorage.setItem('hype_evento_id', userEventoId);
+                
                 if (userRol === 'Boleteria') {
                     window.location.href = '/boleteria';
                 } else {
@@ -300,14 +304,13 @@
             cargarReportes();
         }
 
-document.getElementById('ventasForm').addEventListener('submit', async (e) => {
+        document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
             const sector_id = document.getElementById('sectorSelectVentas').value;
             const cantidad = document.getElementById('cantidadVentas').value;
             const pago_manual = window.modoPago === 'manual';
             
-            // AGREGAMOS LA CAPTURA DEL MAIL
             const email_comprador = document.getElementById('emailTransferencia').value;
             
             const botones = e.target.querySelectorAll('button[type="submit"]');
@@ -317,7 +320,6 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
                 const res = await fetch(`${API_URL}/tickets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    // SUMAMOS EL email_comprador AL ENVÍO
                     body: JSON.stringify({ evento_id, sector_id, cantidad, pago_manual, email_comprador })
                 });
                 
@@ -329,17 +331,14 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
                     const textoLinks = data.links.join('\n\n');
                     const tipoEntrada = pago_manual ? 'las entradas (ya pagadas)' : 'los links de pago';
                     
-                    // Armamos el mensaje limpio para copiar y codificado para la URL
                     const mensajeLimpio = `¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`;
                     const mensajeWa = encodeURIComponent(mensajeLimpio);
                     document.getElementById('ventasForm').style.display = 'none';
-                    // ACCIÓN 1: AUTO-COPIAR AL PORTAPAPELES
+                    
                     navigator.clipboard.writeText(mensajeLimpio).catch(() => console.log('Error al auto-copiar'));
 
-                    // ACCIÓN 2: AUTO-ABRIR WHATSAPP
                     window.open(`https://wa.me/?text=${mensajeWa}`, '_blank');
                     
-                    // Renderizamos la interfaz como respaldo (por si el navegador bloquea el pop-up)
                     document.getElementById('resultadoLink').innerHTML = `
                         <div class="link-generado">
                             <p style="margin-top: 0; font-weight: 500; font-size: 16px; color: #00ffcc;">✅ ¡Generado, copiado y abriendo WhatsApp!</p>
@@ -364,8 +363,8 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
         function nuevaVenta() {
             document.getElementById('resultadoLink').innerHTML = '';
             document.getElementById('cantidadVentas').value = 1;
-            document.getElementById('emailTransferencia').value = ''; // Limpia el mail
-            document.getElementById('ventasForm').style.display = 'block'; // Vuelve a mostrar los botones
+            document.getElementById('emailTransferencia').value = '';
+            document.getElementById('ventasForm').style.display = 'block';
         }
 
         function copiarLink(textoCodificado) {
@@ -446,7 +445,6 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             try {
                 const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
                 
-                // Si el token falló o no hay permisos, frenamos acá
                 if (!resVentas.ok) {
                     if (resVentas.status === 403) {
                         alert("Tu sesión expiró. Por favor, volvé a iniciar sesión.");
@@ -457,7 +455,6 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
 
                 const ventas = await resVentas.json();
                 
-                // Verificamos que sea un array válido antes de procesarlo
                 if (Array.isArray(ventas)) {
                     document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
                         const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px; font-size: 11px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
