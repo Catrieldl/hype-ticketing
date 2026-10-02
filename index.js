@@ -188,7 +188,6 @@ app.post('/api/iniciar-pago', async (req, res) => {
       const ticketQ = await pool.query('UPDATE tickets SET email_comprador = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', [email, codigo, 'Pendiente']);
       if (ticketQ.rows.length === 0) return res.status(400).json({ error: 'Ticket no válido o ya pagado.' });
       
-      // Redirige al simulador interno
       res.json({ url: `/simulador-pago/${codigo}` }); 
   } catch (err) {
       res.status(500).json({ error: 'Error del servidor.' });
@@ -208,7 +207,6 @@ app.post('/api/webhooks/nave', async (req, res) => {
                 const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [ticketPagado.evento_id]);
                 const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
-                // URL del QR en imagen
                 const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticketPagado.codigo_qr}`;
                 const linkEntrada = `https://hypevenue.up.railway.app/comprar/${ticketPagado.codigo_qr}`;
                 
@@ -237,9 +235,53 @@ app.post('/api/webhooks/nave', async (req, res) => {
     }
 });
 
-app.get('/simulador-pago-exitoso/:codigo', async (req, res) => {
-    await axios.post('http://localhost:' + PORT + '/api/webhooks/nave', { status: 'approved', reference: req.params.codigo });
-    res.redirect(`/comprar/${req.params.codigo}`);
+// --- PANTALLA DEL SIMULADOR DE PAGO ---
+app.get('/simulador-pago/:codigo', (req, res) => {
+    const codigo = req.params.codigo;
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Simulador de Pago</title>
+            <style>
+                body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; padding: 50px 20px; }
+                h2 { color: #00ffcc; text-transform: uppercase; letter-spacing: 1px; }
+                .btn { background: #00ffcc; color: #000; padding: 15px 30px; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; width: 100%; max-width: 300px; }
+                .btn:active { background: #00cc99; }
+            </style>
+        </head>
+        <body>
+            <h2>Entorno de Pruebas</h2>
+            <p>Hacé clic abajo para simular un pago aprobado.</p>
+            <button class="btn" onclick="simular()">Simular Pago Exitoso</button>
+
+            <script>
+                async function simular() {
+                    document.querySelector('.btn').innerText = "Procesando...";
+                    
+                    const res = await fetch('/api/webhooks/nave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            reference: "${codigo}", 
+                            status: "approved" 
+                        }) 
+                    });
+
+                    if(res.ok) {
+                        alert("✅ Pago simulado con éxito. El QR ya está generado.");
+                        window.location.href = '/comprar/${codigo}';
+                    } else {
+                        alert("❌ Hubo un error en la simulación.");
+                        document.querySelector('.btn').innerText = "Reintentar";
+                    }
+                }
+            </script>
+        </body>
+        </html>
+    `);
 });
 
 // --- VISTA FINAL DEL COMPRADOR ---
