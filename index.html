@@ -61,7 +61,15 @@
                 <option value="">Primero seleccioná un evento...</option>
             </select>
             <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de links a generar">
-            <button type="submit">Generar Link(s) de Pago</button>
+            
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button type="submit" onclick="window.modoPago='nave'" style="flex: 1; padding: 12px; font-weight: bold; background: #00ffcc; color: #000; border: none; border-radius: 6px; cursor: pointer;">
+                    Generar Link (Nave)
+                </button>
+                <button type="submit" onclick="window.modoPago='manual'" style="flex: 1; padding: 12px; font-weight: bold; background: #ffaa00; color: #000; border: none; border-radius: 6px; cursor: pointer;">
+                    Generar Pagado (Transf)
+                </button>
+            </div>
         </form>
         <div id="resultadoLink"></div>
     </div>
@@ -289,38 +297,43 @@
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
             const sector_id = document.getElementById('sectorSelectVentas').value;
             const cantidad = document.getElementById('cantidadVentas').value;
+            const pago_manual = window.modoPago === 'manual';
             
-            const botonSubmit = e.target.querySelector('button[type="submit"]');
-            botonSubmit.disabled = true;
-            botonSubmit.innerText = 'Generando...';
+            const botones = e.target.querySelectorAll('button[type="submit"]');
+            botones.forEach(b => b.disabled = true);
 
-            const res = await fetch(`${API_URL}/tickets`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id, sector_id, cantidad })
-            });
-            const data = await res.json();
-            
-            botonSubmit.disabled = false;
-            botonSubmit.innerText = 'Generar Link(s) de Pago';
-            
-            if (data.links) {
-                const textoLinks = data.links.join('\n\n');
-                const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés los links de pago para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
+            try {
+                const res = await fetch(`${API_URL}/tickets`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ evento_id, sector_id, cantidad, pago_manual })
+                });
+                const data = await res.json();
                 
-                document.getElementById('resultadoLink').innerHTML = `
-                    <div class="link-generado">
-                        <p style="margin-top: 0; font-weight: 500; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
-                        <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #fff; color: #000; flex: 1;">📋 Copiar</button>
-                            <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: 600; text-transform: uppercase; box-sizing: border-box; font-size: 14px; letter-spacing: 1px;">WhatsApp</a>
+                botones.forEach(b => b.disabled = false);
+                
+                if (data.links) {
+                    const textoLinks = data.links.join('\n\n');
+                    const tipoEntrada = pago_manual ? 'las entradas (ya pagadas)' : 'los links de pago';
+                    const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
+                    
+                    document.getElementById('resultadoLink').innerHTML = `
+                        <div class="link-generado">
+                            <p style="margin-top: 0; font-weight: 500; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #fff; color: #000; flex: 1;">📋 Copiar</button>
+                                <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: 600; text-transform: uppercase; box-sizing: border-box; font-size: 14px; letter-spacing: 1px;">WhatsApp</a>
+                            </div>
+                            <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                         </div>
-                        <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
-                    </div>
-                `;
-                if (userRol !== 'Vendedor') cargarReportes(); 
-            } else {
-                alert(data.error || 'Error al generar links');
+                    `;
+                    if (userRol !== 'Vendedor') cargarReportes(); 
+                } else {
+                    alert(data.error || 'Error al generar links');
+                }
+            } catch (err) {
+                botones.forEach(b => b.disabled = false);
+                alert("Error de conexión");
             }
         });
 
