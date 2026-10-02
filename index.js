@@ -181,49 +181,17 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
   }
 });
 
-// --- RUTA INICIAR PAGO EN NAVE ---
+// --- RUTA INICIAR PAGO (SIMULADOR) ---
 app.post('/api/iniciar-pago', async (req, res) => {
   try {
       const { codigo, email } = req.body;
-      
       const ticketQ = await pool.query('UPDATE tickets SET email_comprador = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', [email, codigo, 'Pendiente']);
       if (ticketQ.rows.length === 0) return res.status(400).json({ error: 'Ticket no válido o ya pagado.' });
       
-      const ticket = ticketQ.rows[0];
-
-      // 1. Obtener Token de autorización de Nave (Sandbox)
-      const tokenRes = await axios.post('https://homoservices.apinaranja.com/security-ms/api/security/auth0/b2b/m2mPrivate', {
-          client_id: process.env.NAVE_CLIENT_ID,
-          client_secret: process.env.NAVE_CLIENT_SECRET,
-          audience: "https://api.ranty.io", // Chequeá en tus credenciales si este valor es distinto
-          grant_type: 'client_credentials'
-      });
-      const accessToken = tokenRes.data.access_token;
-
-      // 2. Crear la orden y generar el link de pago (Sandbox)
-      const checkoutRes = await axios.post('https://api-sandbox.ranty.io/integrations/payment_requests/ecommerce', {
-          external_payment_id: ticket.codigo_qr,
-          seller: {
-              pos_id: process.env.NAVE_POS_ID
-          },
-          transaction: {
-              amount: {
-                  currency: "ARS",
-                  value: ticket.precio
-              }
-          }
-      }, {
-          headers: { 
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-          }
-      });
-
-      // Redirigir al cliente al link de pago real de Nave
-      res.json({ url: checkoutRes.data.checkout_url }); // Nave devuelve la url en "checkout_url"
+      // Redirige al simulador interno
+      res.json({ url: `/simulador-pago/${codigo}` }); 
   } catch (err) {
-      console.error('Error con Nave:', err.response ? err.response.data : err.message);
-      res.status(500).json({ error: 'Error al procesar el pago con el servidor.' });
+      res.status(500).json({ error: 'Error del servidor.' });
   }
 });
 
