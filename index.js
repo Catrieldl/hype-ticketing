@@ -450,4 +450,20 @@ app.get('/scanner', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// --- RUTINA DE LIMPIEZA AUTOMÁTICA (CARRITOS ABANDONADOS) ---
+// Se ejecuta automáticamente cada 1 hora (3600000 ms)
+setInterval(async () => {
+    try {
+        const result = await pool.query(
+            "DELETE FROM tickets WHERE estado = 'Pendiente' AND fecha_venta < NOW() - INTERVAL '24 hours'"
+        );
+        if (result.rowCount > 0) {
+            console.log(`Limpieza automática: ${result.rowCount} tickets Pendientes eliminados (más de 24hs).`);
+        }
+    } catch (err) {
+        console.error('Error en la limpieza automática:', err.message);
+    }
+}, 3600000); // 3600000 milisegundos = 1 hora
+
 app.listen(PORT, () => console.log(`Puerto ${PORT}`));
