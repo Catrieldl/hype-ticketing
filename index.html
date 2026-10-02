@@ -404,35 +404,57 @@
         async function cargarReportes() {
             if (userRol !== 'Fundador' && userRol !== 'Admin') return;
             
-            const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
-            const ventas = await resVentas.json();
-            document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
-                const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px; font-size: 11px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
-                const nombreCompleto = v.nombre ? `${v.nombre} ${v.apellido}` : v.email;
-                const linkWa = v.whatsapp ? `<a href="https://wa.me/${v.whatsapp}" class="wa-link" target="_blank">${v.whatsapp}</a>` : 'N/A';
+            try {
+                const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
                 
-                return `<li>
-                    <span><strong>${nombreCompleto}</strong> (${v.rol})<br><small style="color:#aaa;">WA: ${linkWa}</small></span>
-                    <div style="text-align: right;">
-                        <span class="stat-badge">${v.total_tickets} tickets pagados</span> 
-                        <span class="stat-badge" style="background:#00ffcc; color:#000;">$${v.total_recaudado}</span>
-                        <br>${btnBorrarVentas}
-                    </div>
-                </li>`;
-            }).join('');
+                // Si el token falló o no hay permisos, frenamos acá
+                if (!resVentas.ok) {
+                    if (resVentas.status === 403) {
+                        alert("Tu sesión expiró. Por favor, volvé a iniciar sesión.");
+                        cerrarSesion();
+                    }
+                    return;
+                }
 
-            const resUsu = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${token}` }});
-            const usuarios = await resUsu.json();
-            document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
-                const btnBorrarUsu = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>` : '';
-                const nombreCompleto = u.nombre ? `${u.nombre} ${u.apellido}` : u.email;
-                const linkWa = u.whatsapp ? `<a href="https://wa.me/${u.whatsapp}" class="wa-link" target="_blank">${u.whatsapp}</a>` : 'N/A';
+                const ventas = await resVentas.json();
+                
+                // Verificamos que sea un array válido antes de procesarlo
+                if (Array.isArray(ventas)) {
+                    document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
+                        const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px; font-size: 11px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
+                        const nombreCompleto = v.nombre ? `${v.nombre} ${v.apellido}` : v.email;
+                        const linkWa = v.whatsapp ? `<a href="https://wa.me/${v.whatsapp}" class="wa-link" target="_blank">${v.whatsapp}</a>` : 'N/A';
+                        
+                        return `<li>
+                            <span><strong>${nombreCompleto}</strong> (${v.rol})<br><small style="color:#aaa;">WA: ${linkWa}</small></span>
+                            <div style="text-align: right;">
+                                <span class="stat-badge">${v.total_tickets} tickets pagados</span> 
+                                <span class="stat-badge" style="background:#00ffcc; color:#000;">$${v.total_recaudado}</span>
+                                <br>${btnBorrarVentas}
+                            </div>
+                        </li>`;
+                    }).join('');
+                }
 
-                return `<li>
-                    <span><strong>${nombreCompleto}</strong><br><small style="color:#aaa;">Email: ${u.email} | WA: ${linkWa} | Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span>
-                    ${btnBorrarUsu}
-                </li>`;
-            }).join('');
+                const resUsu = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${token}` }});
+                if (!resUsu.ok) return;
+
+                const usuarios = await resUsu.json();
+                if (Array.isArray(usuarios)) {
+                    document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
+                        const btnBorrarUsu = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>` : '';
+                        const nombreCompleto = u.nombre ? `${u.nombre} ${u.apellido}` : u.email;
+                        const linkWa = u.whatsapp ? `<a href="https://wa.me/${u.whatsapp}" class="wa-link" target="_blank">${u.whatsapp}</a>` : 'N/A';
+
+                        return `<li>
+                            <span><strong>${nombreCompleto}</strong><br><small style="color:#aaa;">Email: ${u.email} | WA: ${linkWa} | Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span>
+                            ${btnBorrarUsu}
+                        </li>`;
+                    }).join('');
+                }
+            } catch (err) {
+                console.error("Error cargando reportes:", err);
+            }
         }
 
         async function borrarUsuario(id) {
