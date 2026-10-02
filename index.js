@@ -147,7 +147,7 @@ app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
 // --- RUTAS DE TICKETS (VENTA) ---
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    let { evento_id, sector_id, cantidad } = req.body;
+    let { evento_id, sector_id, cantidad, pago_manual } = req.body;
     const vendedor_id = req.usuario.id; 
     cantidad = parseInt(cantidad) || 1;
 
@@ -165,12 +165,15 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     const preventaActiva = preventaQuery.rows[0];
 
     const linksGenerados = [];
+    
+    // Acá definimos si nace Pagado (transferencia) o Pendiente (Nave)
+    const estado_inicial = pago_manual ? 'Pagado' : 'Pendiente';
 
     for(let i = 0; i < cantidad; i++) {
         const codigo_qr = crypto.randomUUID(); 
         await pool.query(
           'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, estado, fecha_venta) VALUES ($1, $2, $3, $4, $5, $6, NOW())',
-          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, 'Pendiente']
+          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, estado_inicial]
         );
         linksGenerados.push(`https://hypevenue.up.railway.app/comprar/${codigo_qr}`);
     }
