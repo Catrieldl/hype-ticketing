@@ -444,6 +444,11 @@ app.post('/api/escanear/:codigo/usar', async (req, res) => {
     }
 });
 
+// Ruta para servir la boletería
+app.get('/boleteria', (req, res) => {
+    res.sendFile(path.join(__dirname, 'boleteria.html'));
+});
+
 // Ruta para servir el archivo del escáner
 app.get('/scanner', (req, res) => {
     res.sendFile(path.join(__dirname, 'scanner.html'));
