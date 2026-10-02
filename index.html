@@ -1,541 +1,475 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel - Hype Venue</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-        body { font-family: 'Jost', sans-serif; padding: 20px; background: #000; color: #fff; }
-        .container { background: #111; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #333; }
-        h2 { margin-top: 0; font-weight: 500; color: #fff; text-transform: uppercase; letter-spacing: 4px; }
-        h3 { font-weight: 400; letter-spacing: 2px; }
-        input, select, button { font-family: 'Jost', sans-serif; padding: 12px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 15px; }
-        button { background: #fff; color: #000; border: none; cursor: pointer; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: background 0.3s; }
-        button:hover { background: #ccc; }
-        .btn-borrar { background: #cc0000; color: #fff; width: auto; padding: 6px 12px; margin-left: 5px; }
-        .btn-editar { background: #0066cc; color: #fff; width: auto; padding: 6px 12px; }
-        .btn-actualizar { background: #00ffcc; color: #000; margin-bottom: 15px; }
-        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas, #navVendedor { display: none; }
-        .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
-        .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
-        li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 6px; }
-        .stat-badge { background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .wa-link { color: #00ffcc; text-decoration: none; font-weight: bold; }
-        .wa-link:hover { text-decoration: underline; }
-        .nav-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
-        .nav-buttons button { background: #333; color: #fff; }
-        .nav-buttons button.active { background: #00ffcc; color: #000; }
-    </style>
-</head>
-<body>
-    <div class="container" id="loginScreen">
-        <h2>Ingresar - HYPE</h2>
-        <div id="loginError" class="error"></div>
-        <form id="loginForm">
-            <input type="email" id="emailLogin" placeholder="Email" required>
-            <input type="password" id="passLogin" placeholder="Contraseña" required>
-            <button type="submit">Entrar</button>
-        </form>
-    </div>
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const path = require('path');
+const axios = require('axios');
 
-    <!-- Navegación para el Vendedor -->
-    <div class="container" id="navVendedor" style="padding: 10px 20px;">
-        <div class="nav-buttons">
-            <button id="btnNavVentas" class="active" onclick="mostrarTab('seccionVentas', 'btnNavVentas')">Generar Venta</button>
-            <button id="btnNavMisVentas" onclick="mostrarTab('seccionMisVentas', 'btnNavMisVentas')">Mis Ventas</button>
-        </div>
-    </div>
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-    <div class="container" id="seccionVentas">
-        <h2>Generar Venta</h2>
-        <form id="ventasForm">
-            <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)">
-                <option value="">Seleccioná un evento...</option>
-            </select>
-            <select id="sectorSelectVentas" required>
-                <option value="">Primero seleccioná un evento...</option>
-            </select>
-            <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de links a generar">
-            <input type="email" id="emailTransferencia" placeholder="Email del comprador (Opcional, para envío directo por Transferencia)">
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button type="submit" onclick="window.modoPago='nave'" style="flex: 1; padding: 12px; font-weight: bold; background: #00ffcc; color: #000; border: none; border-radius: 6px; cursor: pointer;">
-                    Generar Link (Nave)
-                </button>
-                <button type="submit" onclick="window.modoPago='manual'" style="flex: 1; padding: 12px; font-weight: bold; background: #ffaa00; color: #000; border: none; border-radius: 6px; cursor: pointer;">
-                    Generar Pagado (Transf)
-                </button>
-            </div>
-        </form>
-        <div id="resultadoLink"></div>
-    </div>
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-    <div class="container" id="seccionMisVentas">
-        <h2>Mis Ventas</h2>
-        <button class="btn-actualizar" onclick="cargarMisVentas()">Actualizar Lista</button>
-        <div id="resumenMisVentas" style="margin-bottom: 15px;"></div>
-        <ul id="listaMisVentas" style="list-style: none; padding: 0;"></ul>
-    </div>
+const SECRET = process.env.JWT_SECRET || 'hype_venue_secreto_2026';
 
-    <div class="container" id="seccionReportes">
-        <h2>Reportes y Usuarios</h2>
-        <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// --- RUTAS DE AUTENTICACIÓN Y USUARIOS ---
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    if (user.rows.length === 0) return res.status(401).json({ error: 'Usuario no encontrado' });
+
+    const validPassword = await bcrypt.compare(password, user.rows[0].password);
+    if (!validPassword) return res.status(401).json({ error: 'Contraseña incorrecta' });
+
+    const token = jwt.sign({ id: user.rows[0].id, rol: user.rows[0].rol, evento_id: user.rows[0].evento_id }, SECRET, { expiresIn: '8h' });
+    res.json({ token, rol: user.rows[0].rol, evento_id: user.rows[0].evento_id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const verificarToken = (req, res, next) => {
+  const token = req.headers['authorization'];
+  if (!token) return res.status(403).json({ error: 'Acceso denegado.' });
+  jwt.verify(token.split(' ')[1], SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ error: 'Token inválido o vencido' });
+    req.usuario = decoded; next();
+  });
+};
+
+app.post('/api/usuarios', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
+  try {
+    const { email, password, rol, evento_id, nombre, apellido, whatsapp } = req.body;
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query(
+      `INSERT INTO usuarios (email, password, rol, evento_id, nombre, apellido, whatsapp) VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, rol = EXCLUDED.rol, evento_id = EXCLUDED.evento_id, nombre = EXCLUDED.nombre, apellido = EXCLUDED.apellido, whatsapp = EXCLUDED.whatsapp`, 
+      [email, hash, rol, evento_id || null, nombre, apellido, whatsapp]
+    );
+    res.json({ mensaje: 'Usuario guardado/actualizado' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/usuarios/:id', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
+  try { await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]); res.json({ mensaje: 'Borrado' }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/usuarios/:id/evento', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
+  try {
+    const ev_id = req.body.evento_id ? req.body.evento_id : null;
+    await pool.query('UPDATE usuarios SET evento_id = $1 WHERE id = $2', [ev_id, req.params.id]);
+    res.json({ mensaje: 'Evento reasignado correctamente' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/usuarios', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    const usuarios = await pool.query('SELECT u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp, e.nombre AS evento_asignado FROM usuarios u LEFT JOIN eventos e ON u.evento_id = e.id ORDER BY u.rol, u.email');
+    res.json(usuarios.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    const ventas = await pool.query(`SELECT u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp, COUNT(t.id) as total_tickets, COALESCE(SUM(t.precio), 0) as total_recaudado FROM usuarios u LEFT JOIN tickets t ON u.id = t.vendedor_id WHERE t.estado = 'Pagado' GROUP BY u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp ORDER BY total_tickets DESC`);
+    res.json(ventas.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/mis-ventas', verificarToken, async (req, res) => {
+  try {
+    const misVentas = await pool.query(`SELECT t.codigo_qr, t.precio, t.sector, t.fecha_venta, t.estado, e.nombre AS evento FROM tickets t LEFT JOIN eventos e ON t.evento_id = e.id WHERE t.vendedor_id = $1 ORDER BY COALESCE(t.fecha_venta, '1970-01-01') DESC, t.id DESC`, [req.usuario.id]);
+    res.json(misVentas.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/ventas/vendedor/:id', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo Fundador' });
+  try { await pool.query('DELETE FROM tickets WHERE vendedor_id = $1', [req.params.id]); res.json({ mensaje: 'Borradas' }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- RUTAS DE EVENTOS, SECTORES Y PREVENTAS ---
+app.post('/api/eventos', verificarToken, async (req, res) => {
+  try { const nuevoEvento = await pool.query('INSERT INTO eventos (nombre, fecha) VALUES ($1, $2) RETURNING *', [req.body.nombre, req.body.fecha]); res.json(nuevoEvento.rows[0]); } 
+  catch (err) { res.status(500).send('Error'); }
+});
+app.get('/api/eventos', async (req, res) => {
+  try { const todosLosEventos = await pool.query('SELECT * FROM eventos WHERE fecha >= NOW() ORDER BY fecha ASC'); res.json(todosLosEventos.rows); } 
+  catch (err) { res.status(500).send('Error'); }
+});
+app.delete('/api/eventos/:id', verificarToken, async (req, res) => {
+  try { await pool.query('DELETE FROM eventos WHERE id = $1', [req.params.id]); res.json({ mensaje: 'Borrado' }); } 
+  catch (err) { res.status(500).send('Error'); }
+});
+app.post('/api/sectores', verificarToken, async (req, res) => {
+  try { const nuevoSector = await pool.query('INSERT INTO sectores (evento_id, nombre, capacidad) VALUES ($1, $2, $3) RETURNING *', [req.body.evento_id, req.body.nombre, req.body.capacidad]); res.json(nuevoSector.rows[0]); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/sectores/:evento_id', async (req, res) => {
+  try { const sectores = await pool.query('SELECT * FROM sectores WHERE evento_id = $1', [req.params.evento_id]); res.json(sectores.rows); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/preventas', verificarToken, async (req, res) => {
+  try { const nueva = await pool.query('INSERT INTO preventas (evento_id, sector_id, nombre, precio, fecha_limite) VALUES ($1, $2, $3, $4, $5) RETURNING *', [req.body.evento_id, req.body.sector_id, req.body.nombre, req.body.precio, req.body.fecha_limite || null]); res.json(nueva.rows[0]); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/preventas/:evento_id', verificarToken, async (req, res) => {
+  try { const preventas = await pool.query(`SELECT p.*, s.nombre AS sector_nombre FROM preventas p JOIN sectores s ON p.sector_id = s.id WHERE p.evento_id = $1`, [req.params.evento_id]); res.json(preventas.rows); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/preventas/:id', verificarToken, async (req, res) => {
+  try { const actualizada = await pool.query('UPDATE preventas SET nombre = $1, precio = $2, fecha_limite = $3 WHERE id = $4 RETURNING *', [req.body.nombre, req.body.precio, req.body.fecha_limite || null, req.params.id]); res.json(actualizada.rows[0]); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
+  try { await pool.query('DELETE FROM preventas WHERE id = $1', [req.params.id]); res.json({ mensaje: 'Borrada' }); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- RUTAS DE TICKETS (VENTA) ---
+app.post('/api/tickets', verificarToken, async (req, res) => {
+  try {
+    let { evento_id, sector_id, cantidad, pago_manual, email_comprador } = req.body; 
+    const vendedor_id = req.usuario.id; 
+    cantidad = parseInt(cantidad) || 1;
+
+    if (req.usuario.rol === 'Vendedor' || req.usuario.rol === 'Boleteria') {
+      if (!req.usuario.evento_id) return res.status(403).json({ error: 'Usuario sin evento.' });
+      evento_id = req.usuario.evento_id;
+    }
+
+    const sectorData = await pool.query('SELECT * FROM sectores WHERE id = $1', [sector_id]);
+    if (sectorData.rows.length === 0) return res.status(400).json({ error: 'Sector no encontrado' });
+    const sector = sectorData.rows[0];
+
+    const preventaQuery = await pool.query('SELECT * FROM preventas WHERE evento_id = $1 AND sector_id = $2 AND (fecha_limite IS NULL OR fecha_limite >= NOW()) ORDER BY fecha_limite ASC LIMIT 1', [evento_id, sector_id]);
+    if (preventaQuery.rows.length === 0) return res.status(400).json({ error: 'No hay preventas activas' });
+    const preventaActiva = preventaQuery.rows[0];
+
+    const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [evento_id]);
+    const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
+
+    const linksGenerados = [];
+    const estado_inicial = pago_manual ? 'Pagado' : 'Pendiente';
+
+    for(let i = 0; i < cantidad; i++) {
+        const codigo_qr = crypto.randomUUID(); 
         
-        <h3 style="margin-top: 20px;">Ventas por Vendedor (Solo Pagados)</h3>
-        <ul id="listaVentasAdmin" style="list-style: none; padding: 0;"></ul>
+        await pool.query(
+          'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, estado, fecha_venta, email_comprador) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
+          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, estado_inicial, email_comprador || null]
+        );
         
-        <h3 style="margin-top: 20px;">Lista de Usuarios</h3>
-        <ul id="listaUsuariosAdmin" style="list-style: none; padding: 0;"></ul>
-    </div>
+        const linkEntrada = `https://hypevenue.up.railway.app/comprar/${codigo_qr}`;
+        linksGenerados.push(linkEntrada);
 
-    <div class="container" id="dashboard">
-        <h2>Crear Evento</h2>
-        <form id="eventoForm">
-            <input type="text" id="nombre" placeholder="Ej: Hype Season 1" required>
-            <input type="datetime-local" id="fecha" required>
-            <button type="submit">Guardar Evento</button>
-        </form>
-        <h3 style="margin-top: 20px;">Eventos Activos</h3>
-        <ul id="listaEventos" style="list-style: none; padding: 0;"></ul>
-    </div>
-
-    <div class="container" id="seccionSectores">
-        <h2>Crear Sector</h2>
-        <form id="sectorForm">
-            <select id="eventoSelectSector" required>
-                <option value="">Seleccioná un evento...</option>
-            </select>
-            <input type="text" id="nombreSector" placeholder="Ej: VIP, General, +21" required>
-            <input type="number" id="capacidadSector" placeholder="Capacidad máxima (Aforo)" required>
-            <button type="submit">Guardar Sector</button>
-        </form>
-    </div>
-
-    <div class="container" id="seccionPreventas">
-        <h2>Configurar Tandas</h2>
-        <form id="preventaForm">
-            <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value); cargarPreventasAdmin(this.value);">
-                <option value="">Seleccioná un evento...</option>
-            </select>
-            <select id="sectorSelectPreventa" required>
-                <option value="">Primero seleccioná un evento...</option>
-            </select>
-            <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1" required>
-            <input type="number" id="precioPreventa" placeholder="Precio ($)" required>
-            <label style="font-size: 12px; color: #aaa; font-weight: 500;">Fecha límite (opcional):</label>
-            <input type="datetime-local" id="fechaLimitePreventa">
-            <button type="submit">Guardar Preventa</button>
-        </form>
-        <h3 style="margin-top: 20px;">Activas</h3>
-        <ul id="listaPreventasAdmin" style="list-style: none; padding: 0;"></ul>
-    </div>
-
-    <div class="container" id="seccionStaff">
-        <h2>Staff</h2>
-        <form id="staffForm" onkeydown="return event.key != 'Enter';">
-            <input type="text" id="nuevoNombre" placeholder="Nombre" required>
-            <input type="text" id="nuevoApellido" placeholder="Apellido" required>
-            <input type="tel" id="nuevoWhatsapp" inputmode="tel" pattern="[\+0-9]*" value="+549" required>
-            <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
-            <input type="password" id="nuevoPass" placeholder="Contraseña" required>
-            <select id="nuevoRol" onchange="toggleEventoStaff(this.value)">
-                <option value="Admin">Administrador</option>
-                <option value="Vendedor">Vendedor (RRPP)</option>
-                <option value="Boleteria">Boletería</option>
-            </select>
-            <select id="eventoSelectStaff" style="display: none;">
-                <option value="">Seleccioná un evento para asignar...</option>
-            </select>
-            <button type="button" onclick="enviarStaffForm()">Crear Usuario</button>
-        </form>
-    </div>
-    
-    <div class="container" id="logoutContainer" style="display:none; text-align: center; background: transparent; box-shadow: none; border: none;">
-        <button onclick="cerrarSesion()" style="background: #444; color: #fff; width: 50%;">Cerrar Sesión</button>
-    </div>
-
-    <script>
-        const API_URL = 'https://hypevenue.up.railway.app/api';
-        let token = localStorage.getItem('hype_token');
-        let userRol = localStorage.getItem('hype_rol');
-        let userEventoId = localStorage.getItem('hype_evento_id');
-
-        // ACÁ ESTÁ LA PRIMERA CORRECCIÓN
-        if (token) {
-            if (userRol === 'Boleteria') window.location.href = '/boleteria';
-            else mostrarDashboard();
-        }
-
-        function mostrarTab(idSeccion, idBoton) {
-            document.getElementById('seccionVentas').style.display = 'none';
-            document.getElementById('seccionMisVentas').style.display = 'none';
-            document.getElementById(idSeccion).style.display = 'block';
-            
-            document.getElementById('btnNavVentas').classList.remove('active');
-            document.getElementById('btnNavMisVentas').classList.remove('active');
-            document.getElementById(idBoton).classList.add('active');
-
-            if (idSeccion === 'seccionMisVentas') cargarMisVentas();
-        }
-
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const res = await fetch(`${API_URL}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: document.getElementById('emailLogin').value, password: document.getElementById('passLogin').value })
-            });
-            const data = await res.json();
-            
-            // ACÁ ESTÁ LA SEGUNDA CORRECCIÓN
-            if (data.token) {
-                token = data.token; userRol = data.rol; userEventoId = data.evento_id;
-                localStorage.setItem('hype_token', token); localStorage.setItem('hype_rol', userRol);
-                if(userEventoId) localStorage.setItem('hype_evento_id', userEventoId);
-                
-                if (userRol === 'Boleteria') {
-                    window.location.href = '/boleteria';
-                } else {
-                    mostrarDashboard();
-                }
-            } else {
-                document.getElementById('loginError').innerText = data.error;
-                document.getElementById('loginError').style.display = 'block';
-            }
-        });
-
-        function mostrarDashboard() {
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('logoutContainer').style.display = 'block';
-            
-            if (userRol === 'Fundador' || userRol === 'Admin') {
-                document.getElementById('seccionVentas').style.display = 'block';
-                document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('seccionSectores').style.display = 'block';
-                document.getElementById('seccionPreventas').style.display = 'block';
-                document.getElementById('seccionReportes').style.display = 'block';
-                cargarReportes();
-                cargarEventos();
-            }
-            if (userRol === 'Fundador') document.getElementById('seccionStaff').style.display = 'block';
-            
-            if (userRol === 'Vendedor') {
-                document.getElementById('navVendedor').style.display = 'block';
-                document.getElementById('seccionVentas').style.display = 'block';
-                document.getElementById('eventoSelectVentas').style.display = 'none';
-                if (userEventoId) cargarSectoresVentas(userEventoId);
-            }
-        }
-
-        function cerrarSesion() { localStorage.clear(); location.reload(); }
-
-        document.getElementById('eventoForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await fetch(`${API_URL}/eventos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ nombre: document.getElementById('nombre').value, fecha: document.getElementById('fecha').value })
-            });
-            cargarEventos();
-        });
-
-        document.getElementById('sectorForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const evento_id = document.getElementById('eventoSelectSector').value;
-            const res = await fetch(`${API_URL}/sectores`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id, nombre: document.getElementById('nombreSector').value, capacidad: document.getElementById('capacidadSector').value })
-            });
-            const data = await res.json();
-            if (data.id) { alert('Sector creado'); document.getElementById('sectorForm').reset(); cargarEventos(); } 
-            else alert(data.error);
-        });
-
-        document.getElementById('preventaForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const evento_id = document.getElementById('eventoSelectPreventa').value;
-            const res = await fetch(`${API_URL}/preventas`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ 
-                    evento_id, sector_id: document.getElementById('sectorSelectPreventa').value, 
-                    nombre: document.getElementById('nombrePreventa').value, 
-                    precio: document.getElementById('precioPreventa').value, 
-                    fecha_limite: document.getElementById('fechaLimitePreventa').value || null 
-                })
-            });
-            const data = await res.json();
-            if (data.id) { alert('Preventa creada'); document.getElementById('preventaForm').reset(); cargarPreventasAdmin(evento_id); } 
-            else alert(data.error);
-        });
-
-        function toggleEventoStaff(rol) {
-            const sel = document.getElementById('eventoSelectStaff');
-            if (rol === 'Vendedor' || rol === 'Boleteria') { sel.style.display = 'block'; sel.required = true; } 
-            else { sel.style.display = 'none'; sel.required = false; sel.value = ''; }
-        }
-
-        async function enviarStaffForm() {
-            const nombre = document.getElementById('nuevoNombre').value;
-            const apellido = document.getElementById('nuevoApellido').value;
-            const whatsapp = document.getElementById('nuevoWhatsapp').value;
-            const email = document.getElementById('nuevoEmail').value;
-            const password = document.getElementById('nuevoPass').value;
-            const rol = document.getElementById('nuevoRol').value;
-            const evento_id = document.getElementById('eventoSelectStaff').value;
-
-            if (!email || !password || !nombre || !apellido || !whatsapp) return alert('Completá todos los campos');
-            if ((rol === 'Vendedor' || rol === 'Boleteria') && !evento_id) return alert('Asigná un evento.');
-
-            const res = await fetch(`${API_URL}/usuarios`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ email, password, rol, evento_id: evento_id || null, nombre, apellido, whatsapp })
-            });
-            const data = await res.json();
-            alert(data.mensaje || data.error);
-            document.getElementById('staffForm').reset();
-            toggleEventoStaff('Admin'); 
-            cargarReportes();
-        }
-
-        document.getElementById('ventasForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
-            const sector_id = document.getElementById('sectorSelectVentas').value;
-            const cantidad = document.getElementById('cantidadVentas').value;
-            const pago_manual = window.modoPago === 'manual';
-            
-            const email_comprador = document.getElementById('emailTransferencia').value;
-            
-            const botones = e.target.querySelectorAll('button[type="submit"]');
-            botones.forEach(b => b.disabled = true);
-
-            try {
-                const res = await fetch(`${API_URL}/tickets`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ evento_id, sector_id, cantidad, pago_manual, email_comprador })
-                });
-                
-                const data = await res.json();
-                
-                botones.forEach(b => b.disabled = false);
-
-               if (data.links) {
-                    const textoLinks = data.links.join('\n\n');
-                    const tipoEntrada = pago_manual ? 'las entradas (ya pagadas)' : 'los links de pago';
-                    
-                    const mensajeLimpio = `¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`;
-                    const mensajeWa = encodeURIComponent(mensajeLimpio);
-                    document.getElementById('ventasForm').style.display = 'none';
-                    
-                    navigator.clipboard.writeText(mensajeLimpio).catch(() => console.log('Error al auto-copiar'));
-
-                    window.open(`https://wa.me/?text=${mensajeWa}`, '_blank');
-                    
-                    document.getElementById('resultadoLink').innerHTML = `
-                        <div class="link-generado">
-                            <p style="margin-top: 0; font-weight: 500; font-size: 16px; color: #00ffcc;">✅ ¡Generado, copiado y abriendo WhatsApp!</p>
-                            <p style="font-size: 12px; color: #aaa;">Si no se abrió automáticamente, usá los botones:</p>
-                            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                                <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #fff; color: #000; flex: 1;">📋 Copiar</button>
-                                <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: 600; text-transform: uppercase; box-sizing: border-box; font-size: 14px; letter-spacing: 1px;">WhatsApp</a>
-                            </div>
-                            <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
+        if (pago_manual && email_comprador) {
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${codigo_qr}`;
+            const correoData = {
+                sender: { email: "hypevenuesp@gmail.com", name: "Hype Venue" },
+                to: [{ email: email_comprador }],
+                subject: `Tu entrada para ${eventoNombre} está lista`,
+                htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
+                        <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
+                        <p>Ya tenés tu lugar asegurado en el sector <strong>${sector.nombre}</strong>.</p>
+                        <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 20px 0;">
+                            <img src="${qrImageUrl}" alt="Tu Código QR" style="display: block; width: 200px; height: 200px;">
                         </div>
-                    `;
-                    if (userRol !== 'Vendedor') cargarReportes(); 
-                } else {
-                    alert(data.error || 'Error al generar links');
+                        <p>Mostrá este QR en puerta.</p>
+                        <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA ONLINE</a>
+                       </div>`
+            };
+
+            axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
+                headers: {
+                    'api-key': process.env.BREVO_API_KEY, 
+                    'Content-Type': 'application/json'
                 }
-            } catch (err) {
-                botones.forEach(b => b.disabled = false);
-                alert("Error de conexión");
-            }
-        });
-        
-        function nuevaVenta() {
-            document.getElementById('resultadoLink').innerHTML = '';
-            document.getElementById('cantidadVentas').value = 1;
-            document.getElementById('emailTransferencia').value = '';
-            document.getElementById('ventasForm').style.display = 'block';
+            }).catch(err => console.error('Error Brevo manual:', err.message));
         }
+    }
 
-        function copiarLink(textoCodificado) {
-            const texto = decodeURIComponent(textoCodificado);
-            navigator.clipboard.writeText(texto).then(() => {
-                alert('¡Link copiado!');
-            }).catch(() => alert('Error al copiar'));
-        }
+    res.json({ links: linksGenerados, precio: preventaActiva.precio, tanda: preventaActiva.nombre, cantidad });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-        async function borrarEvento(id) {
-            if(confirm('¿Eliminar evento?')) { await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarEventos(); }
-        }
+// --- RUTA INICIAR PAGO (SIMULADOR) ---
+app.post('/api/iniciar-pago', async (req, res) => {
+  try {
+      const { codigo, email } = req.body;
+      const ticketQ = await pool.query('UPDATE tickets SET email_comprador = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', [email, codigo, 'Pendiente']);
+      if (ticketQ.rows.length === 0) return res.status(400).json({ error: 'Ticket no válido o ya pagado.' });
+      
+      res.json({ url: `/simulador-pago/${codigo}` }); 
+  } catch (err) {
+      res.status(500).json({ error: 'Error del servidor.' });
+  }
+});
 
-        async function borrarPreventa(id, evento_id) {
-            if(confirm('¿Eliminar preventa?')) { 
-                await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); 
-                cargarPreventasAdmin(evento_id); 
-            }
-        }
+// --- WEBHOOK DE NAVE ---
+app.post('/api/webhooks/nave', async (req, res) => {
+    try {
+        const { status, reference } = req.body; 
 
-        async function editarPreventa(id, evento_id, n, p, f) {
-            const nn = prompt("Nombre de tanda:", n); if (!nn) return;
-            const np = prompt("Precio ($):", p); if (!np) return;
-            const nf = prompt("Fecha límite (YYYY-MM-DD HH:MM o vacío):", f ? f.replace('T', ' ').substring(0, 16) : '');
-            const res = await fetch(`${API_URL}/preventas/${id}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ nombre: nn, precio: np, fecha_limite: nf || null })
-            });
-            const data = await res.json();
-            if (data.id) { alert('Preventa actualizada'); cargarPreventasAdmin(evento_id); } else alert('Error');
-        }
-
-        async function cargarEventos() {
-            const res = await fetch(`${API_URL}/eventos`);
-            const eventos = await res.json();
-            if (userRol === 'Fundador' || userRol === 'Admin') {
-                document.getElementById('listaEventos').innerHTML = eventos.map(e => `<li><span><strong>${e.nombre}</strong> - ${new Date(e.fecha).toLocaleString()}</span>${userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarEvento(${e.id})">Eliminar</button>` : ''}</li>`).join('');
-            }
-            const opts = '<option value="">Seleccioná un evento...</option>' + eventos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
-            ['eventoSelectVentas', 'eventoSelectSector', 'eventoSelectPreventa', 'eventoSelectStaff'].forEach(id => document.getElementById(id).innerHTML = opts);
-        }
-
-        async function cargarSectoresVentas(id) {
-            const sel = document.getElementById('sectorSelectVentas');
-            if (!id) return sel.innerHTML = '<option value="">Primero seleccioná un evento...</option>';
-            const res = await fetch(`${API_URL}/sectores/${id}`); const sec = await res.json();
-            sel.innerHTML = '<option value="">Seleccioná un sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre} (Cap: ${s.capacidad})</option>`).join('');
-        }
-
-        async function cargarSectoresPreventa(id) {
-            const sel = document.getElementById('sectorSelectPreventa');
-            if (!id) return sel.innerHTML = '<option value="">Primero seleccioná un evento...</option>';
-            const res = await fetch(`${API_URL}/sectores/${id}`); const sec = await res.json();
-            sel.innerHTML = '<option value="">Seleccioná un sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
-        }
-
-        async function cargarPreventasAdmin(id) {
-            const lst = document.getElementById('listaPreventasAdmin');
-            if (!id) return lst.innerHTML = '';
-            const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }});
-            const prev = await res.json();
+        if (status === 'approved' || status === 'paid') {
+            const result = await pool.query('UPDATE tickets SET estado = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', ['Pagado', reference, 'Pendiente']);
             
-            lst.innerHTML = prev.map(p => {
-                const btnBorrarPrev = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button>` : '';
-                return `<li>
-                    <span><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span>
-                    <div>
-                        <button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button>
-                        ${btnBorrarPrev}
-                    </div>
-                </li>`;
-            }).join('');
-        }
+            if (result.rows.length > 0) {
+                const ticketPagado = result.rows[0];
+                const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [ticketPagado.evento_id]);
+                const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
-        async function cargarReportes() {
-            if (userRol !== 'Fundador' && userRol !== 'Admin') return;
-            
-            try {
-                const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
+                const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticketPagado.codigo_qr}`;
+                const linkEntrada = `https://hypevenue.up.railway.app/comprar/${ticketPagado.codigo_qr}`;
                 
-                if (!resVentas.ok) {
-                    if (resVentas.status === 403) {
-                        alert("Tu sesión expiró. Por favor, volvé a iniciar sesión.");
-                        cerrarSesion();
-                    }
-                    return;
-                }
-
-                const ventas = await resVentas.json();
-                
-                if (Array.isArray(ventas)) {
-                    document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
-                        const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px; font-size: 11px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
-                        const nombreCompleto = v.nombre ? `${v.nombre} ${v.apellido}` : v.email;
-                        const linkWa = v.whatsapp ? `<a href="https://wa.me/${v.whatsapp}" class="wa-link" target="_blank">${v.whatsapp}</a>` : 'N/A';
-                        
-                        return `<li>
-                            <span><strong>${nombreCompleto}</strong> (${v.rol})<br><small style="color:#aaa;">WA: ${linkWa}</small></span>
-                            <div style="text-align: right;">
-                                <span class="stat-badge">${v.total_tickets} tickets pagados</span> 
-                                <span class="stat-badge" style="background:#00ffcc; color:#000;">$${v.total_recaudado}</span>
-                                <br>${btnBorrarVentas}
+                const correoData = {
+                    sender: { email: "hypevenuesp@gmail.com", name: "Hype Venue" }, 
+                    to: [{ email: ticketPagado.email_comprador }],
+                    subject: `Tu entrada para ${eventoNombre} está lista`,
+                    htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
+                            <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
+                            <p>Ya tenés tu lugar asegurado en el sector <strong>${ticketPagado.sector}</strong>.</p>
+                            
+                            <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 20px 0;">
+                                <img src="${qrImageUrl}" alt="Tu Código QR" style="display: block; width: 200px; height: 200px;">
                             </div>
-                        </li>`;
-                    }).join('');
+                            
+                            <p>Mostrá este QR en puerta.</p>
+                            <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA ONLINE</a>
+                           </div>`
+                };
+
+                axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
+                    headers: {
+                        'api-key': process.env.BREVO_API_KEY,
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => console.log('Correo enviado por API exitosamente'))
+                  .catch(err => console.error('Error enviando API:', err.response?.data || err.message));
+            }
+        }
+        res.sendStatus(200);
+    } catch (err) {
+        res.sendStatus(500);
+    }
+});
+
+// --- PANTALLA DEL SIMULADOR DE PAGO ---
+app.get('/simulador-pago/:codigo', (req, res) => {
+    const codigo = req.params.codigo;
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Simulador de Pago</title>
+            <style>
+                body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; padding: 50px 20px; }
+                h2 { color: #00ffcc; text-transform: uppercase; letter-spacing: 1px; }
+                .btn { background: #00ffcc; color: #000; padding: 15px 30px; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; width: 100%; max-width: 300px; }
+                .btn:active { background: #00cc99; }
+            </style>
+        </head>
+        <body>
+            <h2>Entorno de Pruebas</h2>
+            <p>Hacé clic abajo para simular un pago aprobado.</p>
+            <button class="btn" onclick="simular()">Simular Pago Exitoso</button>
+            <script>
+                async function simular() {
+                    document.querySelector('.btn').innerText = "Procesando...";
+                    
+                    const res = await fetch('/api/webhooks/nave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            reference: "${codigo}", 
+                            status: "approved" 
+                        }) 
+                    });
+
+                    if(res.ok) {
+                        alert("✅ Pago simulado con éxito. El QR ya está generado.");
+                        window.location.href = '/comprar/${codigo}';
+                    } else {
+                        alert("❌ Hubo un error en la simulación.");
+                        document.querySelector('.btn').innerText = "Reintentar";
+                    }
                 }
+            </script>
+        </body>
+        </html>
+    `);
+});
 
-                const resUsu = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${token}` }});
-                if (!resUsu.ok) return;
+// --- VISTA FINAL DEL COMPRADOR ---
+app.get('/comprar/:codigo', async (req, res) => {
+  try {
+    const ticketQuery = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [req.params.codigo]);
+    if (ticketQuery.rows.length === 0) return res.status(404).send('<h1>Ticket no encontrado o inválido</h1>');
 
-                const usuarios = await resUsu.json();
-                if (Array.isArray(usuarios)) {
-                    document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
-                        const btnBorrarUsu = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>` : '';
-                        const nombreCompleto = u.nombre ? `${u.nombre} ${u.apellido}` : u.email;
-                        const linkWa = u.whatsapp ? `<a href="https://wa.me/${u.whatsapp}" class="wa-link" target="_blank">${u.whatsapp}</a>` : 'N/A';
+    const ticket = ticketQuery.rows[0];
+    const eventoQuery = await pool.query('SELECT * FROM eventos WHERE id = $1', [ticket.evento_id]);
+    const evento = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
-                        return `<li>
-                            <span><strong>${nombreCompleto}</strong><br><small style="color:#aaa;">Email: ${u.email} | WA: ${linkWa} | Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span>
-                            ${btnBorrarUsu}
-                        </li>`;
-                    }).join('');
-                }
-            } catch (err) {
-                console.error("Error cargando reportes:", err);
-            }
+    if (ticket.estado === 'Pendiente') {
+        return res.send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Completar Pago - Hype Venue</title>
+                <style>
+                    body { font-family: 'Arial', sans-serif; background: #000; color: #fff; text-align: center; padding: 40px; }
+                    .card { background: #111; padding: 30px; border-radius: 12px; max-width: 400px; margin: auto; border: 1px solid #333; }
+                    input, button { width: 100%; padding: 12px; margin-top: 15px; box-sizing: border-box; border-radius: 6px; font-size: 16px; }
+                    input { background: #222; color: #fff; border: 1px solid #444; }
+                    button { background: #00ffcc; color: #000; border: none; font-weight: bold; cursor: pointer; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h2 style="color: #00ffcc; margin-top:0;">HYPE VENUE</h2>
+                    <h3>${evento} - Sector: ${ticket.sector}</h3>
+                    <p>Total a pagar: <strong>$${ticket.precio}</strong></p>
+                    <p style="font-size: 14px; color: #aaa;">Ingresá tu correo electrónico. A este mail te va a llegar la entrada con el código QR una vez que finalices el pago.</p>
+                    
+                    <form id="formPago">
+                        <input type="email" id="emailCompra" placeholder="tu-correo@ejemplo.com" required>
+                        <button type="submit" id="btnPagar">Ir a Pagar</button>
+                    </form>
+                </div>
+                <script>
+                    document.getElementById('formPago').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const btn = document.getElementById('btnPagar');
+                        btn.innerText = 'Redirigiendo...';
+                        btn.disabled = true;
+
+                        const email = document.getElementById('emailCompra').value;
+                        const response = await fetch('/api/iniciar-pago', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ codigo: '${ticket.codigo_qr}', email: email })
+                        });
+                        const data = await response.json();
+                        if(data.url) window.location.href = data.url; 
+                        else alert('Error al iniciar pago');
+                    });
+                </script>
+            </body>
+            </html>
+        `);
+    }
+
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}`;
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Tu Entrada - Hype Venue</title>
+          <style>
+              body { font-family: Arial; background: #000; color: #fff; text-align: center; padding: 40px; }
+              .card { background: #111; padding: 30px; border-radius: 12px; max-width: 400px; margin: auto; border: 2px solid #00ffcc; box-shadow: 0 0 20px rgba(0, 255, 204, 0.2); }
+              h1 { color: #00ffcc; margin-bottom: 10px; letter-spacing: 3px;}
+              .precio { font-size: 24px; color: #00ffcc; font-weight: bold; margin: 20px 0; }
+              .info { margin: 10px 0; color: #ccc; }
+              .badge-pagado { background: #00ffcc; color: #000; display: inline-block; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; }
+          </style>
+      </head>
+      <body>
+          <div class="card">
+              <div class="badge-pagado">✔ PAGADO</div>
+              <h1>HYPE VENUE</h1>
+              <h3>${evento}</h3>
+              <p class="info">Sector: <strong>${ticket.sector}</strong></p>
+              <div class="precio">$${ticket.precio}</div>
+              
+              <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 15px 0;">
+                  <img src="${qrImageUrl}" alt="Código QR" style="display: block; width: 200px; height: 200px;">
+              </div>
+              
+              <p style="font-size: 12px; color: #888;">Código único: ${ticket.codigo_qr}</p>
+              <p style="margin-top: 20px; font-size: 14px; color: #ffaa00;">Presentá este QR en puerta.</p>
+          </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send('Error en el servidor');
+  }
+});
+
+// --- RUTAS PARA ESCÁNER EN PUERTA ---
+app.get('/api/escanear/:codigo', async (req, res) => {
+    try {
+        const query = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [req.params.codigo]);
+        if (query.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado' });
+        res.json(query.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/escanear/:codigo/usar', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "UPDATE tickets SET estado = 'Usado' WHERE codigo_qr = $1 AND estado = 'Pagado' RETURNING *", 
+            [req.params.codigo]
+        );
+        if (result.rows.length === 0) return res.status(400).json({ error: 'El ticket no está Pagado o ya fue Usado' });
+        res.json({ mensaje: 'Acceso autorizado', ticket: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Ruta para servir la boletería
+app.get('/boleteria', (req, res) => {
+    res.sendFile(path.join(__dirname, 'boleteria.html'));
+});
+
+// Ruta para servir el archivo del escáner
+app.get('/scanner', (req, res) => {
+    res.sendFile(path.join(__dirname, 'scanner.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+
+// --- RUTINA DE LIMPIEZA AUTOMÁTICA (CARRITOS ABANDONADOS) ---
+setInterval(async () => {
+    try {
+        const result = await pool.query(
+            "DELETE FROM tickets WHERE estado = 'Pendiente' AND fecha_venta < NOW() - INTERVAL '24 hours'"
+        );
+        if (result.rowCount > 0) {
+            console.log(`Limpieza automática: ${result.rowCount} tickets Pendientes eliminados.`);
         }
+    } catch (err) {
+        console.error('Error en la limpieza automática:', err.message);
+    }
+}, 3600000); // 1 hora
 
-        async function borrarUsuario(id) {
-            if(confirm('¿Seguro querés eliminar a este usuario?')) {
-                await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-                cargarReportes();
-            }
-        }
-
-        async function borrarVentasVendedor(id) {
-            if(confirm('¿Seguro querés eliminar TODAS las ventas de este vendedor? Los tickets ya generados dejarán de ser válidos.')) {
-                await fetch(`${API_URL}/ventas/vendedor/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-                cargarReportes();
-            }
-        }
-
-        async function cargarMisVentas() {
-            const res = await fetch(`${API_URL}/mis-ventas`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const ventas = await res.json();
-            
-            const ticketsPagados = ventas.filter(v => v.estado === 'Pagado');
-            const totalTickets = ticketsPagados.length;
-            const totalRecaudado = ticketsPagados.reduce((acc, v) => acc + Number(v.precio), 0);
-            
-            document.getElementById('resumenMisVentas').innerHTML = `
-                <span class="stat-badge" style="background:#333;">${totalTickets} pagados</span> 
-                <span class="stat-badge" style="background:#00ffcc; color:#000;">Total: $${totalRecaudado}</span>
-            `;
-            
-            document.getElementById('listaMisVentas').innerHTML = ventas.map((v) => {
-                const linkUrl = `https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`;
-                const fechaVenta = v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : 'Fecha no registrada';
-                const badgeColor = v.estado === 'Pagado' ? '#00ffcc' : '#ffaa00';
-                const badgeText = '#000';
-                
-                return `<li>
-                    <span><strong>${v.sector}</strong> - $${v.precio}<br>
-                    <small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Gen: ${fechaVenta}</small></span>
-                    <div style="text-align: right;">
-                        <span class="stat-badge" style="background:${badgeColor}; color:${badgeText}; margin-bottom: 5px; display: inline-block;">${v.estado}</span><br>
-                        <button type="button" style="width: auto; padding: 6px 12px; font-size: 12px; background: #333; color: #fff;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Link</button>
-                    </div>
-                </li>`;
-            }).join('');
-        }
-    </script>
-</body>
-</html>
+app.listen(PORT, () => console.log(`Puerto ${PORT}`));
