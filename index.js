@@ -233,10 +233,10 @@ app.post('/api/webhooks/nave', async (req, res) => {
                            </div>`
                 };
 
-                // Enviamos la petición directa por HTTP (Puerto 443 web, nunca se bloquea)
+// Enviamos la petición directa por HTTP
                 axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
                     headers: {
-                        'api-key': process.env.BREVO_API_KEY,
+                        'api-key': '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', 
                         'Content-Type': 'application/json'
                     }
                 }).then(() => console.log('Correo enviado por API exitosamente'))
