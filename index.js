@@ -187,16 +187,36 @@ app.post('/api/iniciar-pago', async (req, res) => {
       const { codigo, email } = req.body;
       
       const ticketQ = await pool.query('UPDATE tickets SET email_comprador = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', [email, codigo, 'Pendiente']);
-      
       if (ticketQ.rows.length === 0) return res.status(400).json({ error: 'Ticket no válido o ya pagado.' });
+      
       const ticket = ticketQ.rows[0];
 
-      // Simulador temporal
-      const urlPago = `https://hypevenue.up.railway.app/simulador-pago-exitoso/${ticket.codigo_qr}`; 
+      // 1. Obtener Token de autorización de Nave
+      const tokenRes = await axios.post('ACA_VA_LA_URL_DE_AUTH_DE_NAVE', {
+          client_id: process.env.NAVE_CLIENT_ID,
+          client_secret: process.env.NAVE_CLIENT_SECRET,
+          grant_type: 'client_credentials'
+      });
+      const accessToken = tokenRes.data.access_token;
 
-      res.json({ url: urlPago });
+      // 2. Crear la orden y generar el link de pago
+      const checkoutRes = await axios.post('ACA_VA_LA_URL_DE_CHECKOUT_DE_NAVE', {
+          amount: ticket.precio,
+          external_reference: ticket.codigo_qr,
+          pos_id: process.env.NAVE_POS_ID,
+          notification_url: 'https://hypevenue.up.railway.app/api/webhooks/nave' // Tu webhook
+      }, {
+          headers: { 
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+          }
+      });
+
+      // Redirigir al cliente al link de pago real de Nave
+      res.json({ url: checkoutRes.data.init_point }); // "init_point" o "url", dependiendo de cómo lo devuelva Nave
   } catch (err) {
-      res.status(500).json({ error: 'Error al procesar el pago' });
+      console.error('Error con Nave:', err.response ? err.response.data : err.message);
+      res.status(500).json({ error: 'Error al procesar el pago con el servidor.' });
   }
 });
 
