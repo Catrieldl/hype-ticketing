@@ -14,15 +14,17 @@
         .usado { background: #cc0000; color: #fff; }
         .pendiente { background: #ffaa00; color: #000; }
         .error { background: #444; color: #fff; }
-        button { background: #fff; color: #000; border: none; padding: 15px 30px; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 20px; cursor: pointer; display: none; width: 100%; max-width: 500px; }
-        button:active { background: #ccc; }
+        .btn { background: #00ffcc; color: #000; border: none; padding: 15px 30px; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 20px; cursor: pointer; width: 100%; max-width: 500px; }
+        .btn:active { background: #00cc99; }
+        #btnReiniciar { display: none; background: #fff; }
     </style>
 </head>
 <body>
     <h2>Control de Puerta</h2>
     <div id="reader"></div>
+    <button id="btnIniciar" class="btn" onclick="iniciarCamara()">Abrir Cámara</button>
     <div id="resultado"></div>
-    <button id="btnReiniciar" onclick="reiniciar()">Escanear Siguiente</button>
+    <button id="btnReiniciar" class="btn" onclick="reiniciar()">Escanear Siguiente</button>
 
     <script>
         const API_URL = '/api';
@@ -33,7 +35,6 @@
             if (!escaneando) return;
             escaneando = false;
             
-            // Pausar lectura para no escanear dos veces seguidas
             html5QrCode.pause(); 
             
             const codigo = decodedText.split('/').pop();
@@ -64,9 +65,10 @@
         }
 
         function iniciarCamara() {
-            // Activa cámara trasera directo
+            document.getElementById('btnIniciar').style.display = 'none';
+            // Chrome requiere que esta acción venga de un clic humano
             html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess)
-            .catch(err => alert("Error al abrir cámara: " + err));
+            .catch(err => alert("Error al abrir cámara: Asegurate de dar permisos a la web."));
         }
 
         function reiniciar() {
@@ -75,9 +77,6 @@
             escaneando = true;
             html5QrCode.resume();
         }
-
-        // Auto-arranque al abrir la web
-        iniciarCamara();
     </script>
 </body>
 </html>
