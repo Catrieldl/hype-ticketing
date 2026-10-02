@@ -37,6 +37,9 @@
             if (!escaneando) return;
             escaneando = false;
             
+            // Vibra al leer cualquier código
+            if (navigator.vibrate) navigator.vibrate(200);
+            
             html5QrCode.pause(); 
             
             const codigo = decodedText.split('/').pop();
@@ -47,20 +50,25 @@
             document.getElementById('btnReiniciar').style.display = 'block';
 
             if (!res.ok) {
+                // Vibración de alerta (error)
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 div.className = 'error'; div.innerHTML = '❌ NO ENCONTRADA'; return;
             }
 
             const ticket = await res.json();
 
             if (ticket.estado === 'Pendiente') {
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 div.className = 'pendiente'; div.innerHTML = `⚠️ FALTA PAGAR<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
             } else if (ticket.estado === 'Usado') {
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                 div.className = 'usado'; div.innerHTML = `🚫 YA INGRESÓ<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
             } else if (ticket.estado === 'Pagado') {
                 const resUsar = await fetch(`${API_URL}/escanear/${codigo}/usar`, { method: 'POST' });
                 if (resUsar.ok) {
                     div.className = 'valido'; div.innerHTML = `✅ PASA<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
                 } else {
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                     div.className = 'error'; div.innerHTML = '❌ ERROR EN PUERTA';
                 }
             }
@@ -68,7 +76,6 @@
 
         function iniciarCamara() {
             document.getElementById('btnIniciar').style.display = 'none';
-            // aspectRatio: 1.5 fuerza un rectángulo apaisado para ganar espacio abajo
             html5QrCode.start(
                 { facingMode: "environment" }, 
                 { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.5 }, 
