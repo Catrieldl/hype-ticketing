@@ -217,7 +217,7 @@ app.post('/api/webhooks/nave', async (req, res) => {
                 
                 // ENVÍO DE CORREO VÍA API BREVO
                 const correoData = {
-                    sender: { email: "hypevenue@gmail.com", name: "Hype Venue" }, // Asegurate de que sea el mail que validaste en Brevo
+                    sender: { email: "hypevenuesp@gmail.com", name: "Hype Venue" }, // Asegurate de que sea el mail que validaste en Brevo
                     to: [{ email: ticketPagado.email_comprador }],
                     subject: `Tu entrada para ${eventoNombre} está lista`,
                     htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
