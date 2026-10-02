@@ -279,7 +279,7 @@
             const evento_id = document.getElementById('eventoSelectStaff').value;
 
             if (!email || !password || !nombre || !apellido || !whatsapp) return alert('Completá todos los campos');
-            if (rol === 'Vendedor' && !evento_id) return alert('Asigná un evento al vendedor.');
+            if ((rol === 'Vendedor' || rol === 'Boleteria') && !evento_id) return alert('Asigná un evento.');
 
             const res = await fetch(`${API_URL}/usuarios`, {
                 method: 'POST',
