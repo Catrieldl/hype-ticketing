@@ -215,11 +215,12 @@ app.post('/api/webhooks/nave', async (req, res) => {
                 const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticketPagado.codigo_qr}`;
                 const linkEntrada = `https://hypevenue.up.railway.app/comprar/${ticketPagado.codigo_qr}`;
                 
-                const mailOptions = {
-                    from: '"Hype Venue" <hypevenue@gmail.com>', 
-                    to: ticketPagado.email_comprador,
+                // ENVÍO DE CORREO VÍA API BREVO
+                const correoData = {
+                    sender: { email: "hypevenue@gmail.com", name: "Hype Venue" }, // Asegurate de que sea el mail que validaste en Brevo
+                    to: [{ email: ticketPagado.email_comprador }],
                     subject: `Tu entrada para ${eventoNombre} está lista`,
-                    html: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
+                    htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
                             <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
                             <p>Ya tenés tu lugar asegurado en el sector <strong>${ticketPagado.sector}</strong>.</p>
                             
@@ -231,7 +232,15 @@ app.post('/api/webhooks/nave', async (req, res) => {
                             <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA ONLINE</a>
                            </div>`
                 };
-                transporter.sendMail(mailOptions).catch(console.error);
+
+                // Enviamos la petición directa por HTTP (Puerto 443 web, nunca se bloquea)
+                axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
+                    headers: {
+                        'api-key': process.env.BREVO_API_KEY,
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => console.log('Correo enviado por API exitosamente'))
+                  .catch(err => console.error('Error enviando API:', err.response?.data || err.message));
             }
         }
         res.sendStatus(200);
