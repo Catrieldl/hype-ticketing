@@ -265,7 +265,7 @@
 
         function toggleEventoStaff(rol) {
             const sel = document.getElementById('eventoSelectStaff');
-            if (rol === 'Vendedor') { sel.style.display = 'block'; sel.required = true; } 
+            if (rol === 'Vendedor' || rol === 'Boleteria') { sel.style.display = 'block'; sel.required = true; } 
             else { sel.style.display = 'none'; sel.required = false; sel.value = ''; }
         }
 
