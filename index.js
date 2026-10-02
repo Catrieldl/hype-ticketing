@@ -149,7 +149,7 @@ app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
 // --- RUTAS DE TICKETS (VENTA) ---
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    let { evento_id, sector_id, cantidad, pago_manual } = req.body;
+    let { evento_id, sector_id, cantidad, pago_manual, email_comprador } = req.body; // Capturamos el mail
     const vendedor_id = req.usuario.id; 
     cantidad = parseInt(cantidad) || 1;
 
@@ -166,18 +166,50 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     if (preventaQuery.rows.length === 0) return res.status(400).json({ error: 'No hay preventas activas' });
     const preventaActiva = preventaQuery.rows[0];
 
+    // Buscamos el nombre del evento para el asunto del mail
+    const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [evento_id]);
+    const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
+
     const linksGenerados = [];
-    
-    // Acá definimos si nace Pagado (transferencia) o Pendiente (Nave)
     const estado_inicial = pago_manual ? 'Pagado' : 'Pendiente';
 
     for(let i = 0; i < cantidad; i++) {
         const codigo_qr = crypto.randomUUID(); 
+        
+        // Guardamos el ticket incluyendo el email_comprador
         await pool.query(
-          'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, estado, fecha_venta) VALUES ($1, $2, $3, $4, $5, $6, NOW())',
-          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, estado_inicial]
+          'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, estado, fecha_venta, email_comprador) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
+          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, estado_inicial, email_comprador || null]
         );
-        linksGenerados.push(`https://hypevenue.up.railway.app/comprar/${codigo_qr}`);
+        
+        const linkEntrada = `https://hypevenue.up.railway.app/comprar/${codigo_qr}`;
+        linksGenerados.push(linkEntrada);
+
+        // Si es pago por transferencia (manual) y nos pasaron un mail, enviamos el QR por Brevo
+        if (pago_manual && email_comprador) {
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${codigo_qr}`;
+            const correoData = {
+                sender: { email: "hypevenuesp@gmail.com", name: "Hype Venue" },
+                to: [{ email: email_comprador }],
+                subject: `Tu entrada para ${eventoNombre} está lista`,
+                htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
+                        <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
+                        <p>Ya tenés tu lugar asegurado en el sector <strong>${sector.nombre}</strong>.</p>
+                        <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 20px 0;">
+                            <img src="${qrImageUrl}" alt="Tu Código QR" style="display: block; width: 200px; height: 200px;">
+                        </div>
+                        <p>Mostrá este QR en puerta.</p>
+                        <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA ONLINE</a>
+                       </div>`
+            };
+
+            axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
+                headers: {
+                    'api-key': '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', 
+                    'Content-Type': 'application/json'
+                }
+            }).catch(err => console.error('Error Brevo manual:', err.message));
+        }
     }
 
     res.json({ links: linksGenerados, precio: preventaActiva.precio, tanda: preventaActiva.nombre, cantidad });
