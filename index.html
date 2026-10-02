@@ -316,15 +316,26 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
                 const data = await res.json();
                 
                 botones.forEach(b => b.disabled = false);
-                
-                if (data.links) {
+
+               if (data.links) {
                     const textoLinks = data.links.join('\n\n');
                     const tipoEntrada = pago_manual ? 'las entradas (ya pagadas)' : 'los links de pago';
-                    const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
+                    
+                    // Armamos el mensaje limpio para copiar y codificado para la URL
+                    const mensajeLimpio = `¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`;
+                    const mensajeWa = encodeURIComponent(mensajeLimpio);
                     document.getElementById('ventasForm').style.display = 'none';
+                    // ACCIÓN 1: AUTO-COPIAR AL PORTAPAPELES
+                    navigator.clipboard.writeText(mensajeLimpio).catch(() => console.log('Error al auto-copiar'));
+
+                    // ACCIÓN 2: AUTO-ABRIR WHATSAPP
+                    window.open(`https://wa.me/?text=${mensajeWa}`, '_blank');
+                    
+                    // Renderizamos la interfaz como respaldo (por si el navegador bloquea el pop-up)
                     document.getElementById('resultadoLink').innerHTML = `
                         <div class="link-generado">
-                            <p style="margin-top: 0; font-weight: 500; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
+                            <p style="margin-top: 0; font-weight: 500; font-size: 16px; color: #00ffcc;">✅ ¡Generado, copiado y abriendo WhatsApp!</p>
+                            <p style="font-size: 12px; color: #aaa;">Si no se abrió automáticamente, usá los botones:</p>
                             <div style="display: flex; gap: 10px; margin-top: 15px;">
                                 <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="background: #fff; color: #000; flex: 1;">📋 Copiar</button>
                                 <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="background: #25D366; color: white; text-align: center; text-decoration: none; padding: 12px; border-radius: 6px; flex: 1; display: inline-block; font-weight: 600; text-transform: uppercase; box-sizing: border-box; font-size: 14px; letter-spacing: 1px;">WhatsApp</a>
