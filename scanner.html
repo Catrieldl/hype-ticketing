@@ -6,17 +6,19 @@
     <title>Escáner - Hype Venue</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-        h2 { color: #00ffcc; letter-spacing: 2px; text-transform: uppercase; font-size: 18px; margin: 0 0 15px 0; flex-shrink: 0; }
-        #reader { width: 100%; max-width: 500px; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; flex-shrink: 0; }
-        #resultado { margin-top: 15px; padding: 15px; border-radius: 8px; font-size: 22px; font-weight: bold; display: none; text-transform: uppercase; width: 100%; max-width: 500px; box-sizing: border-box; flex-shrink: 0; }
+        body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 10px; height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+        h2 { color: #00ffcc; letter-spacing: 2px; font-size: 18px; margin: 5px 0; flex-shrink: 0; }
+        #reader { width: 100%; max-width: 400px; max-height: 45vh; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; }
+        #reader video { object-fit: cover; max-height: 45vh !important; }
+        #resultado { margin-top: 10px; padding: 15px; border-radius: 8px; font-size: 20px; font-weight: bold; display: none; text-transform: uppercase; width: 100%; max-width: 400px; box-sizing: border-box; }
         .valido { background: #00cc66; color: #fff; }
         .usado { background: #cc0000; color: #fff; }
         .pendiente { background: #ffaa00; color: #000; }
         .error { background: #444; color: #fff; }
-        .btn { background: #00ffcc; color: #000; border: none; padding: 20px; font-size: 18px; font-weight: bold; border-radius: 6px; margin-top: 15px; cursor: pointer; width: 100%; max-width: 500px; flex-shrink: 0; }
+        .btn { background: #00ffcc; color: #000; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; max-width: 400px; }
         .btn:active { background: #00cc99; }
-        #btnReiniciar { display: none; background: #fff; }
+        #btnReiniciar { display: none; background: #fff; margin-bottom: 15px; }
+        #btnIniciar { margin: auto; }
     </style>
 </head>
 <body>
@@ -66,10 +68,10 @@
 
         function iniciarCamara() {
             document.getElementById('btnIniciar').style.display = 'none';
-            // aspectRatio: 1.0 hace la cámara cuadrada para que no ocupe todo el alto
+            // aspectRatio: 1.5 fuerza un rectángulo apaisado para ganar espacio abajo
             html5QrCode.start(
                 { facingMode: "environment" }, 
-                { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }, 
+                { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.5 }, 
                 onScanSuccess
             ).catch(err => alert("Error al abrir cámara."));
         }
