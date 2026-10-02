@@ -141,8 +141,8 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     const vendedor_id = req.usuario.id; 
     cantidad = parseInt(cantidad) || 1;
 
-    if (req.usuario.rol === 'Vendedor') {
-      if (!req.usuario.evento_id) return res.status(403).json({ error: 'Vendedor sin evento.' });
+    if (req.usuario.rol === 'Vendedor' || req.usuario.rol === 'Boleteria') {
+      if (!req.usuario.evento_id) return res.status(403).json({ error: 'Usuario sin evento.' });
       evento_id = req.usuario.evento_id;
     }
 
