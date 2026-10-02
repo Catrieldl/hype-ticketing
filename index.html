@@ -292,12 +292,15 @@
             cargarReportes();
         }
 
-        document.getElementById('ventasForm').addEventListener('submit', async (e) => {
+document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
             const sector_id = document.getElementById('sectorSelectVentas').value;
             const cantidad = document.getElementById('cantidadVentas').value;
             const pago_manual = window.modoPago === 'manual';
+            
+            // AGREGAMOS LA CAPTURA DEL MAIL
+            const email_comprador = document.getElementById('emailTransferencia').value;
             
             const botones = e.target.querySelectorAll('button[type="submit"]');
             botones.forEach(b => b.disabled = true);
@@ -306,8 +309,10 @@
                 const res = await fetch(`${API_URL}/tickets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ evento_id, sector_id, cantidad, pago_manual })
+                    // SUMAMOS EL email_comprador AL ENVÍO
+                    body: JSON.stringify({ evento_id, sector_id, cantidad, pago_manual, email_comprador })
                 });
+                
                 const data = await res.json();
                 
                 botones.forEach(b => b.disabled = false);
