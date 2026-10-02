@@ -321,7 +321,7 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
                     const textoLinks = data.links.join('\n\n');
                     const tipoEntrada = pago_manual ? 'las entradas (ya pagadas)' : 'los links de pago';
                     const mensajeWa = encodeURIComponent(`¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`);
-                    
+                    document.getElementById('ventasForm').style.display = 'none';
                     document.getElementById('resultadoLink').innerHTML = `
                         <div class="link-generado">
                             <p style="margin-top: 0; font-weight: 500; font-size: 16px;">${data.cantidad} Link(s) listos (${data.tanda})</p>
