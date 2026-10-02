@@ -164,7 +164,10 @@
         let userRol = localStorage.getItem('hype_rol');
         let userEventoId = localStorage.getItem('hype_evento_id');
 
-        if (token) mostrarDashboard();
+        if (token) {
+            if (userRol === 'Boleteria') window.location.href = '/boleteria';
+            else mostrarDashboard();
+        }
 
         function mostrarTab(idSeccion, idBoton) {
             document.getElementById('seccionVentas').style.display = 'none';
@@ -190,7 +193,11 @@
                 token = data.token; userRol = data.rol; userEventoId = data.evento_id;
                 localStorage.setItem('hype_token', token); localStorage.setItem('hype_rol', userRol);
                 if(userEventoId) localStorage.setItem('hype_evento_id', userEventoId);
-                mostrarDashboard();
+                if (userRol === 'Boleteria') {
+                    window.location.href = '/boleteria';
+                } else {
+                    mostrarDashboard();
+                }
             } else {
                 document.getElementById('loginError').innerText = data.error;
                 document.getElementById('loginError').style.display = 'block';
