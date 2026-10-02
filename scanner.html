@@ -2,19 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Escáner - Hype Venue</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 20px; }
-        h2 { color: #00ffcc; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
-        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; }
-        #resultado { margin-top: 20px; padding: 30px 20px; border-radius: 8px; font-size: 22px; font-weight: bold; display: none; text-transform: uppercase; }
+        body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        h2 { color: #00ffcc; letter-spacing: 2px; text-transform: uppercase; font-size: 18px; margin: 0 0 15px 0; flex-shrink: 0; }
+        #reader { width: 100%; max-width: 500px; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; flex-shrink: 0; }
+        #resultado { margin-top: 15px; padding: 15px; border-radius: 8px; font-size: 22px; font-weight: bold; display: none; text-transform: uppercase; width: 100%; max-width: 500px; box-sizing: border-box; flex-shrink: 0; }
         .valido { background: #00cc66; color: #fff; }
         .usado { background: #cc0000; color: #fff; }
         .pendiente { background: #ffaa00; color: #000; }
         .error { background: #444; color: #fff; }
-        .btn { background: #00ffcc; color: #000; border: none; padding: 15px 30px; font-size: 16px; font-weight: bold; border-radius: 6px; margin-top: 20px; cursor: pointer; width: 100%; max-width: 500px; }
+        .btn { background: #00ffcc; color: #000; border: none; padding: 20px; font-size: 18px; font-weight: bold; border-radius: 6px; margin-top: 15px; cursor: pointer; width: 100%; max-width: 500px; flex-shrink: 0; }
         .btn:active { background: #00cc99; }
         #btnReiniciar { display: none; background: #fff; }
     </style>
@@ -42,10 +42,10 @@
             const div = document.getElementById('resultado');
             
             div.style.display = 'block';
-            document.getElementById('btnReiniciar').style.display = 'inline-block';
+            document.getElementById('btnReiniciar').style.display = 'block';
 
             if (!res.ok) {
-                div.className = 'error'; div.innerHTML = '❌ ENTRADA NO ENCONTRADA'; return;
+                div.className = 'error'; div.innerHTML = '❌ NO ENCONTRADA'; return;
             }
 
             const ticket = await res.json();
@@ -59,16 +59,19 @@
                 if (resUsar.ok) {
                     div.className = 'valido'; div.innerHTML = `✅ PASA<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
                 } else {
-                    div.className = 'error'; div.innerHTML = '❌ ERROR AL MARCAR INGRESO';
+                    div.className = 'error'; div.innerHTML = '❌ ERROR EN PUERTA';
                 }
             }
         }
 
         function iniciarCamara() {
             document.getElementById('btnIniciar').style.display = 'none';
-            // Chrome requiere que esta acción venga de un clic humano
-            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess)
-            .catch(err => alert("Error al abrir cámara: Asegurate de dar permisos a la web."));
+            // aspectRatio: 1.0 hace la cámara cuadrada para que no ocupe todo el alto
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }, 
+                onScanSuccess
+            ).catch(err => alert("Error al abrir cámara."));
         }
 
         function reiniciar() {
