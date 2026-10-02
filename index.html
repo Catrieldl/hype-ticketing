@@ -43,7 +43,6 @@
         </form>
     </div>
 
-    <!-- Navegación para el Vendedor -->
     <div class="container" id="navVendedor" style="padding: 10px 20px;">
         <div class="nav-buttons">
             <button id="btnNavVentas" class="active" onclick="mostrarTab('seccionVentas', 'btnNavVentas')">Generar Venta</button>
@@ -139,7 +138,7 @@
         <form id="staffForm" onkeydown="return event.key != 'Enter';">
             <input type="text" id="nuevoNombre" placeholder="Nombre" required>
             <input type="text" id="nuevoApellido" placeholder="Apellido" required>
-            <input type="tel" id="nuevoWhatsapp" inputmode="tel" pattern="[\+0-9]*" value="+549" required>
+            <input type="tel" id="nuevoWhatsapp" inputmode="tel" pattern="[\\+0-9]*" value="+549" required>
             <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
             <input type="password" id="nuevoPass" placeholder="Contraseña" required>
             <select id="nuevoRol" onchange="toggleEventoStaff(this.value)">
@@ -476,8 +475,19 @@
                 const usuarios = await resUsu.json();
                 if (Array.isArray(usuarios)) {
                     document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
-                        const btnBorrarUsu = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>` : '';
-                        const btnAsignarUsu = userRol === 'Fundador' ? `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar Evento</button>` : '';
+                        let btnBorrarUsu = '';
+                        let btnAsignarUsu = '';
+                        
+                        if (userRol === 'Fundador') {
+                            btnBorrarUsu = `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>`;
+                            btnAsignarUsu = `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar Evento</button>`;
+                        } else if (userRol === 'Admin') {
+                            btnAsignarUsu = `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar Evento</button>`;
+                            if (u.rol !== 'Fundador') {
+                                btnBorrarUsu = `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>`;
+                            }
+                        }
+
                         const nombreCompleto = u.nombre ? `${u.nombre} ${u.apellido}` : u.email;
                         const linkWa = u.whatsapp ? `<a href="https://wa.me/${u.whatsapp}" class="wa-link" target="_blank">${u.whatsapp}</a>` : 'N/A';
 
