@@ -62,9 +62,26 @@ app.post('/api/usuarios', verificarToken, async (req, res) => {
 });
 
 app.delete('/api/usuarios/:id', verificarToken, async (req, res) => {
-  if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo el Fundador' });
-  try { await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]); res.json({ mensaje: 'Borrado' }); } 
-  catch (err) { res.status(500).json({ error: err.message }); }
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    if (req.usuario.rol === 'Admin') {
+      const target = await pool.query('SELECT rol FROM usuarios WHERE id = $1', [req.params.id]);
+      if (target.rows.length > 0 && target.rows[0].rol === 'Fundador') {
+        return res.status(403).json({ error: 'Un Admin no puede borrar al Fundador.' });
+      }
+    }
+    await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]); 
+    res.json({ mensaje: 'Borrado' }); 
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/usuarios/:id/evento', verificarToken, async (req, res) => {
+  if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+  try {
+    const ev_id = req.body.evento_id ? req.body.evento_id : null;
+    await pool.query('UPDATE usuarios SET evento_id = $1 WHERE id = $2', [ev_id, req.params.id]);
+    res.json({ mensaje: 'Evento reasignado correctamente' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/usuarios', verificarToken, async (req, res) => {
@@ -137,7 +154,7 @@ app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
 // --- RUTAS DE TICKETS (VENTA) ---
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    let { evento_id, sector_id, cantidad, pago_manual, email_comprador } = req.body; // Capturamos el mail
+    let { evento_id, sector_id, cantidad, pago_manual, email_comprador } = req.body; 
     const vendedor_id = req.usuario.id; 
     cantidad = parseInt(cantidad) || 1;
 
@@ -154,7 +171,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     if (preventaQuery.rows.length === 0) return res.status(400).json({ error: 'No hay preventas activas' });
     const preventaActiva = preventaQuery.rows[0];
 
-    // Buscamos el nombre del evento para el asunto del mail
     const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [evento_id]);
     const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
@@ -164,7 +180,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
     for(let i = 0; i < cantidad; i++) {
         const codigo_qr = crypto.randomUUID(); 
         
-        // Guardamos el ticket incluyendo el email_comprador
         await pool.query(
           'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, estado, fecha_venta, email_comprador) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
           [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, estado_inicial, email_comprador || null]
@@ -173,7 +188,6 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
         const linkEntrada = `https://hypevenue.up.railway.app/comprar/${codigo_qr}`;
         linksGenerados.push(linkEntrada);
 
-        // Si es pago por transferencia (manual) y nos pasaron un mail, enviamos el QR por Brevo
         if (pago_manual && email_comprador) {
             const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${codigo_qr}`;
             const correoData = {
@@ -235,9 +249,8 @@ app.post('/api/webhooks/nave', async (req, res) => {
                 const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticketPagado.codigo_qr}`;
                 const linkEntrada = `https://hypevenue.up.railway.app/comprar/${ticketPagado.codigo_qr}`;
                 
-                // ENVÍO DE CORREO VÍA API BREVO
                 const correoData = {
-                    sender: { email: "hypevenuesp@gmail.com", name: "Hype Venue" }, // Asegurate de que sea el mail que validaste en Brevo
+                    sender: { email: "hypevenuesp@gmail.com", name: "Hype Venue" }, 
                     to: [{ email: ticketPagado.email_comprador }],
                     subject: `Tu entrada para ${eventoNombre} está lista`,
                     htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
@@ -253,7 +266,6 @@ app.post('/api/webhooks/nave', async (req, res) => {
                            </div>`
                 };
 
-// Enviamos la petición directa por HTTP
                 axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
                     headers: {
                         'api-key': process.env.BREVO_API_KEY,
@@ -290,7 +302,6 @@ app.get('/simulador-pago/:codigo', (req, res) => {
             <h2>Entorno de Pruebas</h2>
             <p>Hacé clic abajo para simular un pago aprobado.</p>
             <button class="btn" onclick="simular()">Simular Pago Exitoso</button>
-
             <script>
                 async function simular() {
                     document.querySelector('.btn').innerText = "Procesando...";
@@ -379,7 +390,6 @@ app.get('/comprar/:codigo', async (req, res) => {
         `);
     }
 
-    // SI ESTÁ PAGADO: Mostramos la entrada con la IMAGEN del QR
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}`;
     res.send(`
       <!DOCTYPE html>
@@ -457,18 +467,17 @@ app.get('/scanner', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 // --- RUTINA DE LIMPIEZA AUTOMÁTICA (CARRITOS ABANDONADOS) ---
-// Se ejecuta automáticamente cada 1 hora (3600000 ms)
 setInterval(async () => {
     try {
         const result = await pool.query(
             "DELETE FROM tickets WHERE estado = 'Pendiente' AND fecha_venta < NOW() - INTERVAL '24 hours'"
         );
         if (result.rowCount > 0) {
-            console.log(`Limpieza automática: ${result.rowCount} tickets Pendientes eliminados (más de 24hs).`);
+            console.log(`Limpieza automática: ${result.rowCount} tickets Pendientes eliminados.`);
         }
     } catch (err) {
         console.error('Error en la limpieza automática:', err.message);
     }
-}, 3600000); // 3600000 milisegundos = 1 hora
+}, 3600000); // 1 hora
 
 app.listen(PORT, () => console.log(`Puerto ${PORT}`));
