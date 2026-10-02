@@ -341,10 +341,12 @@ document.getElementById('ventasForm').addEventListener('submit', async (e) => {
                 alert("Error de conexión");
             }
         });
-
+        
         function nuevaVenta() {
             document.getElementById('resultadoLink').innerHTML = '';
             document.getElementById('cantidadVentas').value = 1;
+            document.getElementById('emailTransferencia').value = ''; // Limpia el mail
+            document.getElementById('ventasForm').style.display = 'block'; // Vuelve a mostrar los botones
         }
 
         function copiarLink(textoCodificado) {
