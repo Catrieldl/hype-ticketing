@@ -2,93 +2,93 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Escáner - Hype Venue</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; margin: 0; padding: 10px; height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
-        h2 { color: #00ffcc; letter-spacing: 2px; font-size: 18px; margin: 5px 0; flex-shrink: 0; }
-        #reader { width: 100%; max-width: 400px; max-height: 45vh; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; }
-        #reader video { object-fit: cover; max-height: 45vh !important; }
-        #resultado { margin-top: 10px; padding: 15px; border-radius: 8px; font-size: 20px; font-weight: bold; display: none; text-transform: uppercase; width: 100%; max-width: 400px; box-sizing: border-box; }
-        .valido { background: #00cc66; color: #fff; }
-        .usado { background: #cc0000; color: #fff; }
-        .pendiente { background: #ffaa00; color: #000; }
-        .error { background: #444; color: #fff; }
-        .btn { background: #00ffcc; color: #000; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; max-width: 400px; }
-        .btn:active { background: #00cc99; }
-        #btnReiniciar { display: none; background: #fff; margin-bottom: 15px; }
-        #btnIniciar { margin: auto; }
+        body { font-family: Arial, sans-serif; background: #000; color: #fff; margin: 0; padding: 20px; text-align: center; }
+        h2 { color: #00ffcc; margin-top: 0; text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* Control estricto del tamaño del lector */
+        #reader { width: 100%; max-width: 350px; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; }
+        #reader button { background: #00ffcc; color: #000; border: none; padding: 10px; border-radius: 4px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        
+        #resultado { margin-top: 20px; padding: 20px; border-radius: 8px; font-size: 18px; font-weight: bold; display: none; max-width: 310px; margin: 20px auto 0 auto; }
+        .estado-ok { background: #00ffcc; color: #000; }
+        .estado-error { background: #ff4444; color: #fff; }
+        .estado-usado { background: #ffaa00; color: #000; }
+        
+        .btn-reiniciar { background: #333; color: #fff; border: 1px solid #555; padding: 15px; border-radius: 6px; margin-top: 15px; cursor: pointer; font-weight: bold; width: 100%; max-width: 350px; display: none; margin-left: auto; margin-right: auto; }
     </style>
 </head>
 <body>
     <h2>Control de Puerta</h2>
     <div id="reader"></div>
-    <button id="btnIniciar" class="btn" onclick="iniciarCamara()">Abrir Cámara</button>
     <div id="resultado"></div>
-    <button id="btnReiniciar" class="btn" onclick="reiniciar()">Escanear Siguiente</button>
+    <button id="btnReiniciar" class="btn-reiniciar" onclick="reiniciarScanner()">Escanear otro ticket</button>
 
     <script>
         const API_URL = '/api';
-        const html5QrCode = new Html5Qrcode("reader");
-        let escaneando = true;
+        let html5QrcodeScanner;
+        
+        function onScanSuccess(decodedText, decodedResult) {
+            html5QrcodeScanner.clear(); 
+            document.getElementById('reader').style.display = 'none';
+            procesarTicket(decodedText.split('/').pop()); // Extrae el UUID si leen el link completo
+        }
 
-        async function onScanSuccess(decodedText) {
-            if (!escaneando) return;
-            escaneando = false;
-            
-            // Vibra al leer cualquier código
-            if (navigator.vibrate) navigator.vibrate(200);
-            
-            html5QrCode.pause(); 
-            
-            const codigo = decodedText.split('/').pop();
-            const res = await fetch(`${API_URL}/escanear/${codigo}`);
-            const div = document.getElementById('resultado');
-            
-            div.style.display = 'block';
-            document.getElementById('btnReiniciar').style.display = 'block';
+        async function procesarTicket(codigo) {
+            const resDiv = document.getElementById('resultado');
+            const btn = document.getElementById('btnReiniciar');
+            resDiv.style.display = 'block';
+            resDiv.className = '';
+            resDiv.innerText = 'Verificando...';
 
-            if (!res.ok) {
-                // Vibración de alerta (error)
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                div.className = 'error'; div.innerHTML = '❌ NO ENCONTRADA'; return;
-            }
+            try {
+                let res = await fetch(`${API_URL}/escanear/${codigo}`);
+                let data = await res.json();
 
-            const ticket = await res.json();
-
-            if (ticket.estado === 'Pendiente') {
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                div.className = 'pendiente'; div.innerHTML = `⚠️ FALTA PAGAR<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
-            } else if (ticket.estado === 'Usado') {
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                div.className = 'usado'; div.innerHTML = `🚫 YA INGRESÓ<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
-            } else if (ticket.estado === 'Pagado') {
-                const resUsar = await fetch(`${API_URL}/escanear/${codigo}/usar`, { method: 'POST' });
-                if (resUsar.ok) {
-                    div.className = 'valido'; div.innerHTML = `✅ PASA<br><span style="font-size: 16px;">Sector: ${ticket.sector}</span>`;
-                } else {
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    div.className = 'error'; div.innerHTML = '❌ ERROR EN PUERTA';
+                if (!res.ok) {
+                    resDiv.classList.add('estado-error');
+                    resDiv.innerText = `❌ ${data.error || 'Ticket no válido'}`;
+                } else if (data.estado === 'Usado') {
+                    resDiv.classList.add('estado-usado');
+                    resDiv.innerHTML = `⚠️ TICKET YA USADO<br><small>Sector: ${data.sector}</small>`;
+                } else if (data.estado === 'Pendiente') {
+                    resDiv.classList.add('estado-error');
+                    resDiv.innerHTML = `❌ TICKET NO PAGADO<br><small>Aún figura como pendiente</small>`;
+                } else if (data.estado === 'Pagado') {
+                    let resUsar = await fetch(`${API_URL}/escanear/${codigo}/usar`, { method: 'POST' });
+                    let dataUsar = await resUsar.json();
+                    
+                    if (resUsar.ok) {
+                        resDiv.classList.add('estado-ok');
+                        resDiv.innerHTML = `✅ ACCESO PERMITIDO<br><strong style="font-size:24px;">${data.sector}</strong>`;
+                    } else {
+                        resDiv.classList.add('estado-error');
+                        resDiv.innerText = `❌ Error al procesar: ${dataUsar.error}`;
+                    }
                 }
+            } catch (err) {
+                resDiv.classList.add('estado-error');
+                resDiv.innerText = "❌ Error de conexión con el servidor.";
             }
+            btn.style.display = 'block';
         }
 
-        function iniciarCamara() {
-            document.getElementById('btnIniciar').style.display = 'none';
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.5 }, 
-                onScanSuccess
-            ).catch(err => alert("Error al abrir cámara."));
-        }
-
-        function reiniciar() {
+        function reiniciarScanner() {
             document.getElementById('resultado').style.display = 'none';
             document.getElementById('btnReiniciar').style.display = 'none';
-            escaneando = true;
-            html5QrCode.resume();
+            document.getElementById('reader').style.display = 'block';
+            iniciarScanner();
         }
+
+        function iniciarScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+            html5QrcodeScanner.render(onScanSuccess);
+        }
+
+        window.onload = iniciarScanner;
     </script>
 </body>
 </html>
