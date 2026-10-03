@@ -315,6 +315,20 @@ app.get('/simulador-pago/:codigo', (req, res) => {
     `);
 });
 
+// --- RUTA ACTIVAR TICKET (Captura de datos) ---
+app.post('/api/tickets/:codigo/activar', async (req, res) => {
+    try {
+        const { nombre, apellido, email, whatsapp, sexo, fecha_nacimiento } = req.body;
+        const result = await pool.query(
+            `UPDATE tickets SET nombre_comprador = $1, apellido_comprador = $2, email_comprador = $3, whatsapp_comprador = $4, sexo = $5, fecha_nacimiento = $6 
+             WHERE codigo_qr = $7 AND estado = 'Pagado' RETURNING *`,
+            [nombre, apellido, email, whatsapp, sexo, fecha_nacimiento, req.params.codigo]
+        );
+        if (result.rows.length === 0) return res.status(400).json({ error: 'Ticket inválido' });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- VISTA FINAL DEL COMPRADOR ---
 app.get('/comprar/:codigo', async (req, res) => {
   try {
@@ -325,30 +339,62 @@ app.get('/comprar/:codigo', async (req, res) => {
     const eventoQuery = await pool.query('SELECT * FROM eventos WHERE id = $1', [ticket.evento_id]);
     const evento = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
 
+    // 1. SI ESTÁ PENDIENTE: Pantalla de Pago
     if (ticket.estado === 'Pendiente') {
         return res.send(`
             <!DOCTYPE html>
-            <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:40px;}.card{background:#111;padding:30px;border-radius:12px;max-width:400px;margin:auto;}input,button{width:100%;padding:12px;margin-top:15px;}button{background:#00ffcc;color:#000;border:none;cursor:pointer;}</style></head>
+            <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Pago</title>
+            <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:40px;}.card{background:#111;padding:30px;border-radius:12px;max-width:400px;margin:auto;}input,button{width:100%;padding:12px;margin-top:15px;box-sizing:border-box;}button{background:#00ffcc;color:#000;border:none;font-weight:bold;cursor:pointer;}</style></head>
             <body><div class="card"><h2 style="color:#00ffcc;">HYPE VENUE</h2><h3>${evento} - Sector: ${ticket.sector}</h3><p>Total: <strong>$${ticket.precio}</strong></p>
-            <form id="formPago"><input type="email" id="emailCompra" placeholder="tu-correo@ejemplo.com" required><button type="submit">Ir a Pagar</button></form></div>
+            <form id="formPago"><input type="email" id="emailCompra" placeholder="tu-correo@ejemplo.com" required><button type="submit" id="btnPagar">Ir a Pagar</button></form></div>
             <script>
                 document.getElementById('formPago').addEventListener('submit', async (e) => {
-                    e.preventDefault(); const res = await fetch('/api/iniciar-pago', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ codigo: '${ticket.codigo_qr}', email: document.getElementById('emailCompra').value }) });
+                    e.preventDefault(); document.getElementById('btnPagar').innerText = 'Cargando...'; document.getElementById('btnPagar').disabled = true;
+                    const res = await fetch('/api/iniciar-pago', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ codigo: '${ticket.codigo_qr}', email: document.getElementById('emailCompra').value }) });
                     const data = await res.json(); if(data.url) window.location.href = data.url; else alert('Error');
                 });
             </script></body></html>
         `);
     }
 
+    // 2. SI ESTÁ PAGADO PERO SIN DATOS: Pantalla de Activación
+    if (!ticket.nombre_comprador) {
+         return res.send(`
+            <!DOCTYPE html>
+            <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Activar Entrada</title>
+            <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:20px;}.card{background:#111;padding:25px;border-radius:12px;max-width:400px;margin:auto;border:1px solid #00ffcc;}input,select,button{width:100%;padding:12px;margin-top:10px;box-sizing:border-box;background:#222;color:#fff;border:1px solid #444;border-radius:6px;}button{background:#00ffcc;color:#000;font-weight:bold;cursor:pointer;border:none;margin-top:20px;}</style></head>
+            <body><div class="card"><h2 style="color:#00ffcc;margin-top:0;">ACTIVÁ TU ENTRADA</h2><p style="font-size:14px;color:#ccc;">Completá tus datos para ver el QR.</p>
+            <form id="formActivar">
+                <input type="text" id="nombre" placeholder="Nombre" required>
+                <input type="text" id="apellido" placeholder="Apellido" required>
+                <input type="email" id="email" placeholder="Email" value="${ticket.email_comprador || ''}" required>
+                <input type="tel" id="whatsapp" placeholder="WhatsApp (Ej: +549...)" required>
+                <select id="sexo" required><option value="">Sexo...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option><option value="Otro">Otro</option></select>
+                <input type="date" id="fecha_nac" required>
+                <button type="submit" id="btnActivar">Generar mi QR</button>
+            </form></div>
+            <script>
+                document.getElementById('formActivar').addEventListener('submit', async (e) => {
+                    e.preventDefault(); document.getElementById('btnActivar').innerText = 'Generando...'; document.getElementById('btnActivar').disabled = true;
+                    const body = { nombre: document.getElementById('nombre').value, apellido: document.getElementById('apellido').value, email: document.getElementById('email').value, whatsapp: document.getElementById('whatsapp').value, sexo: document.getElementById('sexo').value, fecha_nacimiento: document.getElementById('fecha_nac').value };
+                    const res = await fetch('/api/tickets/${ticket.codigo_qr}/activar', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+                    if(res.ok) window.location.reload(); else { alert('Error al activar'); document.getElementById('btnActivar').innerText = 'Generar mi QR'; document.getElementById('btnActivar').disabled = false; }
+                });
+            </script></body></html>
+        `);
+    }
+
+    // 3. SI ESTÁ PAGADO Y ACTIVADO: Se muestra el QR
     res.send(`
       <!DOCTYPE html>
-      <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:40px;}.card{background:#111;padding:30px;border-radius:12px;max-width:400px;margin:auto;border:2px solid #00ffcc;}</style></head>
-      <body><div class="card"><div style="background:#00ffcc;color:#000;display:inline-block;padding:5px 15px;border-radius:20px;font-weight:bold;">✔ HABILITADO</div>
-      <h1 style="color:#00ffcc;">HYPE VENUE</h1><h3>${evento}</h3><p>Sector: <strong>${ticket.sector}</strong></p><div style="font-size:24px;color:#00ffcc;font-weight:bold;">$${ticket.precio}</div>
-      <div style="background:#fff;padding:15px;border-radius:10px;display:inline-block;margin:15px 0;"><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}" style="width:200px;height:200px;"></div>
-      <p style="color:#ffaa00;">Presentá este QR en puerta.</p></div></body></html>
+      <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tu Entrada</title>
+      <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:20px;}.card{background:#111;padding:30px;border-radius:12px;max-width:400px;margin:auto;border:2px solid #00ffcc;}h1{color:#00ffcc;margin-bottom:5px;}</style></head>
+      <body><div class="card"><div style="background:#00ffcc;color:#000;display:inline-block;padding:5px 15px;border-radius:20px;font-weight:bold;margin-bottom:10px;">✔ HABILITADO</div>
+      <h1>HYPE VENUE</h1><h3>${evento}</h3>
+      <p style="margin:5px 0;color:#00ffcc;font-size:18px;"><strong>${ticket.nombre_comprador.toUpperCase()} ${ticket.apellido_comprador.toUpperCase()}</strong></p>
+      <p style="margin:5px 0;">Sector: <strong>${ticket.sector}</strong></p>
+      <div style="background:#fff;padding:15px;border-radius:10px;display:inline-block;margin:15px 0;"><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}" style="width:200px;height:200px;display:block;"></div>
+      <p style="color:#ffaa00;font-weight:bold;">Presentá este QR en puerta junto a tu DNI.</p></div></body></html>
     `);
   } catch (err) { res.status(500).send('Error'); }
 });
