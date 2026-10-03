@@ -5,38 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Escáner - Hype Venue</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Agregamos la misma tipografía premium del panel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; background: #000; color: #fff; margin: 0; padding: 20px; text-align: center; }
-        h2 { color: #00ffcc; margin-top: 0; text-transform: uppercase; letter-spacing: 2px; }
+        body { font-family: 'Jost', sans-serif; background: #000; color: #fff; margin: 0; padding: 20px; text-align: center; }
+        h2 { color: #00ffcc; margin-top: 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
         
-        /* Lector limpio sin recuadros extra de la librería */
-        #reader { width: 100%; max-width: 350px; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; }
+        /* Lector ultra limpio */
+        #reader { width: 100%; max-width: 350px; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; position: relative; }
+        #reader video { width: 100% !important; border-radius: 6px; display: block; object-fit: cover; }
         
-        #resultado { margin-top: 20px; padding: 20px; border-radius: 8px; font-size: 18px; font-weight: bold; display: none; max-width: 310px; margin: 20px auto 0 auto; }
+        /* BLOQUEO FORZADO: Oculta cualquier texto o link nativo de la librería china */
+        #reader a, #reader span, #reader div[style*="text-align"] { display: none !important; }
+        
+        #resultado { margin-top: 20px; padding: 20px; border-radius: 8px; font-size: 18px; font-weight: 700; display: none; max-width: 310px; margin: 20px auto 0 auto; text-transform: uppercase; letter-spacing: 1px; }
         .estado-ok { background: #00ffcc; color: #000; }
         .estado-error { background: #ff4444; color: #fff; }
         .estado-usado { background: #ffaa00; color: #000; }
         
-        .btn-reiniciar { background: #333; color: #fff; border: 1px solid #555; padding: 15px; border-radius: 6px; margin-top: 15px; cursor: pointer; font-weight: bold; width: 100%; max-width: 350px; display: none; margin-left: auto; margin-right: auto; }
-        #btnIniciar { background: #00ffcc; color: #000; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 15px; width: 100%; max-width: 350px; }
+        /* Botones unificados y prolijos */
+        .btn { font-family: 'Jost', sans-serif; background: #00ffcc; color: #000; border: none; padding: 15px; border-radius: 6px; font-weight: 700; font-size: 16px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; width: 100%; max-width: 350px; margin: 10px auto; display: block; }
+        .btn-reiniciar { background: #333; color: #fff; border: 1px solid #555; display: none; }
     </style>
 </head>
 <body>
     <h2>Control de Puerta</h2>
-    <!-- Botón inicial para que el navegador nos deje prender la cámara sin bloquearnos -->
-    <button id="btnIniciar" onclick="iniciarCamara()">Encender Cámara</button>
     
+    <button id="btnIniciar" class="btn" onclick="iniciarCamara()">Encender Cámara</button>
     <div id="reader" style="display: none;"></div>
     <div id="resultado"></div>
-    <button id="btnReiniciar" class="btn-reiniciar" onclick="reiniciarScanner()">Escanear otro ticket</button>
+    <button id="btnReiniciar" class="btn btn-reiniciar" onclick="reiniciarScanner()">Escanear otro ticket</button>
 
     <script>
         const API_URL = '/api';
         let html5QrCode;
         
         function onScanSuccess(decodedText, decodedResult) {
-            // Frena la cámara al instante para ahorrar batería y no leer 2 veces
             html5QrCode.stop().then(() => {
+                document.getElementById('reader').style.display = 'none';
+                procesarTicket(decodedText.split('/').pop());
+            }).catch(err => {
                 document.getElementById('reader').style.display = 'none';
                 procesarTicket(decodedText.split('/').pop());
             });
@@ -45,39 +55,28 @@
         async function procesarTicket(codigo) {
             const resDiv = document.getElementById('resultado');
             const btn = document.getElementById('btnReiniciar');
-            resDiv.style.display = 'block';
-            resDiv.className = '';
-            resDiv.innerText = 'Verificando...';
+            resDiv.style.display = 'block'; resDiv.className = ''; resDiv.innerText = 'VERIFICANDO...';
 
             try {
                 let res = await fetch(`${API_URL}/escanear/${codigo}`);
                 let data = await res.json();
 
                 if (!res.ok) {
-                    resDiv.classList.add('estado-error');
-                    resDiv.innerText = `❌ ${data.error || 'Ticket no válido'}`;
+                    resDiv.classList.add('estado-error'); resDiv.innerText = `❌ ${data.error || 'Inválido'}`;
                 } else if (data.estado === 'Usado') {
-                    resDiv.classList.add('estado-usado');
-                    resDiv.innerHTML = `⚠️ TICKET YA USADO<br><small>Sector: ${data.sector}</small>`;
+                    resDiv.classList.add('estado-usado'); resDiv.innerHTML = `⚠️ YA USADO<br><small style="font-size:14px;">Sector: ${data.sector}</small>`;
                 } else if (data.estado === 'Pendiente') {
-                    resDiv.classList.add('estado-error');
-                    resDiv.innerHTML = `❌ TICKET NO PAGADO<br><small>Aún figura como pendiente</small>`;
+                    resDiv.classList.add('estado-error'); resDiv.innerHTML = `❌ NO PAGADO<br><small style="font-size:14px;">Estado pendiente</small>`;
                 } else if (data.estado === 'Pagado') {
                     let resUsar = await fetch(`${API_URL}/escanear/${codigo}/usar`, { method: 'POST' });
                     let dataUsar = await resUsar.json();
-                    
                     if (resUsar.ok) {
-                        resDiv.classList.add('estado-ok');
-                        resDiv.innerHTML = `✅ ACCESO PERMITIDO<br><strong style="font-size:24px;">${data.sector}</strong>`;
+                        resDiv.classList.add('estado-ok'); resDiv.innerHTML = `✅ PERMITIDO<br><strong style="font-size:24px;">${data.sector}</strong>`;
                     } else {
-                        resDiv.classList.add('estado-error');
-                        resDiv.innerText = `❌ Error al procesar: ${dataUsar.error}`;
+                        resDiv.classList.add('estado-error'); resDiv.innerText = `❌ Error: ${dataUsar.error}`;
                     }
                 }
-            } catch (err) {
-                resDiv.classList.add('estado-error');
-                resDiv.innerText = "❌ Error de conexión con el servidor.";
-            }
+            } catch (err) { resDiv.classList.add('estado-error'); resDiv.innerText = "❌ Error de conexión."; }
             btn.style.display = 'block';
         }
 
@@ -90,17 +89,12 @@
         function iniciarCamara() {
             document.getElementById('btnIniciar').style.display = 'none';
             document.getElementById('reader').style.display = 'block';
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
             
-            // Usamos la clase base sin interfaz gráfica
-            html5QrCode = new Html5Qrcode("reader");
-            
-            // Forzamos la cámara trasera ("environment")
             html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                onScanSuccess
+                { facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess
             ).catch(err => {
-                alert("Aceptá los permisos de cámara para continuar.");
+                alert("Permití el acceso a la cámara.");
                 document.getElementById('btnIniciar').style.display = 'block';
                 document.getElementById('reader').style.display = 'none';
             });
