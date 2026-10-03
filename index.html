@@ -25,7 +25,7 @@
         .btn-editar { background: #0099ff; color: #fff; }
         .btn-actualizar { background: #00ffcc; color: #000; margin-bottom: 15px; }
         
-        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas, #seccionEstadisticas, #navVendedor { display: none; }
+        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionListaNegra, #seccionMisVentas, #seccionEstadisticas, #navVendedor { display: none; }
         
         .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
         .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
@@ -49,7 +49,7 @@
         </form>
     </div>
 
-    <!-- Navegación para Vendedor (o vista simplificada) -->
+    <!-- Navegación para Vendedor -->
     <div class="container" id="navVendedor" style="padding: 10px 20px;">
         <div class="nav-buttons">
             <button id="btnNavVentas" class="active" onclick="mostrarTab('seccionVentas', 'btnNavVentas')">Generar Venta</button>
@@ -66,7 +66,7 @@
             <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad">
             <input type="email" id="emailTransferencia" placeholder="Email del comprador (Opcional)">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button type="submit" onclick="window.modoPago='nave'" style="flex: 1; padding: 12px; font-weight: bold; background: #00ffcc; color: #000; border: none; border-radius: 6px;">
+                <button type="submit" id="btnNave" onclick="window.modoPago='nave'" style="flex: 1; padding: 12px; font-weight: bold; background: #00ffcc; color: #000; border: none; border-radius: 6px;">
                     Generar Link (Nave)
                 </button>
                 <button type="submit" onclick="window.modoPago='manual'" style="flex: 1; padding: 12px; font-weight: bold; background: #ffaa00; color: #000; border: none; border-radius: 6px;">
@@ -87,7 +87,7 @@
         <ul id="listaMisVentas" style="list-style: none; padding: 0;"></ul>
     </div>
 
-    <!-- MÓDULO NUEVO: AFORO Y ARQUEO -->
+    <!-- AFORO Y ARQUEO -->
     <div class="container" id="seccionEstadisticas">
         <h2>Aforo y Arqueo (En Vivo)</h2>
         <select id="eventoSelectEstadisticas" onchange="cargarEstadisticas(this.value)">
@@ -107,9 +107,26 @@
         </div>
     </div>
 
+    <!-- LISTA NEGRA -->
+    <div class="container" id="seccionListaNegra">
+        <h2>Lista Negra (Admisión)</h2>
+        <p style="font-size:14px; color:#aaa; margin-top:0;">Bloqueá emails para impedirles obtener códigos QR.</p>
+        <form id="listaNegraForm">
+            <input type="email" id="emailListaNegra" placeholder="Correo a bloquear (Ej: brayan@mail.com)" required>
+            <input type="text" id="motivoListaNegra" placeholder="Motivo o nombre de la persona (Opcional)">
+            <button type="submit" style="background: #cc0000; color: #fff;">Bloquear Email</button>
+        </form>
+        <h3 style="margin-top: 20px;">Correos Bloqueados</h3>
+        <ul id="listaNegraAdmin" style="list-style: none; padding: 0;"></ul>
+    </div>
+
     <div class="container" id="seccionReportes">
         <h2>Reportes y Usuarios</h2>
+        
         <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
+        <button class="btn-actualizar" style="background:#0099ff; color:#fff;" onclick="descargarClientes()">⬇ Descargar Base de Clientes (Excel)</button>
+        <button id="btnToggleNave" class="btn-actualizar" style="background:#ffaa00; color:#000; display:none;" onclick="toggleNave()">Apagar/Prender Link de Nave</button>
+        
         <h3 style="margin-top: 20px;">Ventas por Vendedor (Solo Pagados)</h3>
         <ul id="listaVentasAdmin" style="list-style: none; padding: 0;"></ul>
         <h3 style="margin-top: 20px;">Lista de Usuarios</h3>
@@ -185,6 +202,14 @@
             else mostrarDashboard();
         }
 
+        async function verificarNave() {
+            try {
+                const res = await fetch(`${API_URL}/config`);
+                const data = await res.json();
+                if (!data.nave_habilitado) document.getElementById('btnNave').style.display = 'none';
+            } catch (err) { console.error('Error config:', err); }
+        }
+
         function mostrarTab(idSeccion, idBoton) {
             document.getElementById('seccionVentas').style.display = 'none';
             document.getElementById('seccionMisVentas').style.display = 'none';
@@ -216,20 +241,25 @@
         function mostrarDashboard() {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('logoutContainer').style.display = 'block';
+            verificarNave();
             
             if (userRol === 'Fundador' || userRol === 'Admin') {
                 document.getElementById('btnGenerarFree').style.display = 'block';
                 document.getElementById('seccionVentas').style.display = 'block';
                 document.getElementById('seccionEstadisticas').style.display = 'block';
+                document.getElementById('seccionListaNegra').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('seccionSectores').style.display = 'block';
                 document.getElementById('seccionPreventas').style.display = 'block';
                 document.getElementById('seccionReportes').style.display = 'block';
                 cargarReportes();
                 cargarEventos();
+                cargarListaNegra();
             }
-            if (userRol === 'Fundador') document.getElementById('seccionStaff').style.display = 'block';
-            
+            if (userRol === 'Fundador') {
+                document.getElementById('seccionStaff').style.display = 'block';
+                document.getElementById('btnToggleNave').style.display = 'inline-block';
+            }
             if (userRol === 'Vendedor') {
                 document.getElementById('navVendedor').style.display = 'block';
                 document.getElementById('seccionVentas').style.display = 'block';
@@ -414,6 +444,59 @@
             const tkts = ventas.filter(v => v.estado === 'Pagado');
             document.getElementById('resumenMisVentas').innerHTML = `<span class="stat-badge" style="background:#333;">${tkts.length} pagados</span> <span class="stat-badge" style="background:#00ffcc; color:#000;">Total: $${tkts.reduce((acc, v) => acc + Number(v.precio), 0)}</span>`;
             document.getElementById('listaMisVentas').innerHTML = ventas.map(v => `<li><span style="flex: 1;"><strong>${v.sector}</strong> - $${v.precio}<br><small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Gen: ${v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : ''}</small></span><div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;"><span class="stat-badge" style="background:${v.estado === 'Pagado' ? '#00ffcc' : '#ffaa00'}; color:#000;">${v.estado}</span><button type="button" style="width: auto; padding: 6px 12px; margin: 0; font-size: 12px; background: #333; color: #fff; border-radius: 4px;" onclick="copiarLink('${encodeURIComponent(`https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`)}')">📋 Link</button></div></li>`).join('');
+        }
+
+        async function toggleNave() {
+            if(confirm('¿Cambiar el estado del pago automático con Nave?')) {
+                const res = await fetch(`${API_URL}/config/nave`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json(); alert(data.mensaje); location.reload();
+            }
+        }
+
+        async function descargarClientes() {
+            try {
+                const res = await fetch(`${API_URL}/reportes/clientes`, { headers: { 'Authorization': `Bearer ${token}` }});
+                const data = await res.json();
+                if(data.length === 0) return alert('No hay clientes registrados.');
+                
+                let csv = 'Nombre,Apellido,Email,WhatsApp,Sexo,Fecha Nacimiento\n';
+                data.forEach(r => {
+                    let fNac = r.fecha_nacimiento ? r.fecha_nacimiento.split('T')[0] : '';
+                    csv += `${r.nombre_comprador || ''},${r.apellido_comprador || ''},${r.email_comprador || ''},${r.whatsapp_comprador || ''},${r.sexo || ''},${fNac}\n`;
+                });
+                
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'clientes_hype.csv'; a.click();
+            } catch (err) { alert('Error al exportar.'); }
+        }
+
+        // Lógica de Lista Negra
+        document.getElementById('listaNegraForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const res = await fetch(`${API_URL}/lista-negra`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ email: document.getElementById('emailListaNegra').value, motivo: document.getElementById('motivoListaNegra').value })
+            });
+            const data = await res.json();
+            if (data.mensaje) { alert(data.mensaje); document.getElementById('listaNegraForm').reset(); cargarListaNegra(); }
+            else alert(data.error);
+        });
+
+        async function cargarListaNegra() {
+            if (userRol !== 'Fundador' && userRol !== 'Admin') return;
+            try {
+                const res = await fetch(`${API_URL}/lista-negra`, { headers: { 'Authorization': `Bearer ${token}` }});
+                const lista = await res.json();
+                document.getElementById('listaNegraAdmin').innerHTML = lista.map(l => `<li><span style="flex: 1;"><strong>${l.email}</strong><br><small style="color:#aaa;">Motivo: ${l.motivo || 'N/A'} | Fecha: ${new Date(l.fecha_bloqueo).toLocaleDateString()}</small></span><button class="btn-borrar" onclick="borrarListaNegra(${l.id})">Desbloquear</button></li>`).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function borrarListaNegra(id) {
+            if(confirm('¿Quitar este email de la lista negra?')) {
+                await fetch(`${API_URL}/lista-negra/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                cargarListaNegra();
+            }
         }
     </script>
 </body>
