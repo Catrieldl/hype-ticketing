@@ -18,32 +18,21 @@
         button { background: #fff; color: #000; border: none; cursor: pointer; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: background 0.3s; }
         button:hover { background: #ccc; }
         
-        /* Botones de acción en listas unificados */
         .btn-borrar, .btn-editar {
-            width: auto;
-            padding: 8px 12px;
-            margin: 0; /* Quitamos márgenes sueltos que desalineaban */
-            font-size: 11px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            line-height: 1.2;
-            letter-spacing: 0.5px;
+            width: auto; padding: 8px 12px; margin: 0; font-size: 11px; border-radius: 4px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; letter-spacing: 0.5px;
         }
         .btn-borrar { background: #cc0000; color: #fff; }
         .btn-editar { background: #0099ff; color: #fff; }
-        
         .btn-actualizar { background: #00ffcc; color: #000; margin-bottom: 15px; }
-        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas, #navVendedor { display: none; }
+        
+        #dashboard, #loginError, #seccionStaff, #seccionVentas, #seccionSectores, #seccionPreventas, #seccionReportes, #seccionMisVentas, #seccionEstadisticas, #navVendedor { display: none; }
+        
         .error { color: #ff4444; font-weight: 600; margin-bottom: 10px; }
         .link-generado { background: #222; padding: 15px; word-break: break-all; margin-top: 15px; border-left: 4px solid #fff; border-radius: 4px; }
         li { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 12px; border: 1px solid #333; border-radius: 6px; }
-        
-        .stat-badge { background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
+        .stat-badge { background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; margin-bottom: 4px; }
         .wa-link { color: #00ffcc; text-decoration: none; font-weight: bold; }
-        .wa-link:hover { text-decoration: underline; }
+        
         .nav-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
         .nav-buttons button { background: #333; color: #fff; }
         .nav-buttons button.active { background: #00ffcc; color: #000; }
@@ -60,7 +49,7 @@
         </form>
     </div>
 
-    <!-- Navegación para el Vendedor -->
+    <!-- Navegación para Vendedor (o vista simplificada) -->
     <div class="container" id="navVendedor" style="padding: 10px 20px;">
         <div class="nav-buttons">
             <button id="btnNavVentas" class="active" onclick="mostrarTab('seccionVentas', 'btnNavVentas')">Generar Venta</button>
@@ -68,25 +57,25 @@
         </div>
     </div>
 
+    <!-- Módulo de Ventas -->
     <div class="container" id="seccionVentas">
         <h2>Generar Venta</h2>
         <form id="ventasForm">
-            <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)">
-                <option value="">Seleccioná un evento...</option>
-            </select>
-            <select id="sectorSelectVentas" required>
-                <option value="">Primero seleccioná un evento...</option>
-            </select>
-            <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad de links a generar">
-            <input type="email" id="emailTransferencia" placeholder="Email del comprador (Opcional, para envío directo por Transferencia)">
+            <select id="eventoSelectVentas" onchange="cargarSectoresVentas(this.value)"><option value="">Seleccioná un evento...</option></select>
+            <select id="sectorSelectVentas" required><option value="">Primero seleccioná un evento...</option></select>
+            <input type="number" id="cantidadVentas" min="1" max="10" value="1" required placeholder="Cantidad">
+            <input type="email" id="emailTransferencia" placeholder="Email del comprador (Opcional)">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button type="submit" onclick="window.modoPago='nave'" style="flex: 1; padding: 12px; font-weight: bold; background: #00ffcc; color: #000; border: none; border-radius: 6px; cursor: pointer;">
+                <button type="submit" onclick="window.modoPago='nave'" style="flex: 1; padding: 12px; font-weight: bold; background: #00ffcc; color: #000; border: none; border-radius: 6px;">
                     Generar Link (Nave)
                 </button>
-                <button type="submit" onclick="window.modoPago='manual'" style="flex: 1; padding: 12px; font-weight: bold; background: #ffaa00; color: #000; border: none; border-radius: 6px; cursor: pointer;">
-                    Generar Pagado (Transf)
+                <button type="submit" onclick="window.modoPago='manual'" style="flex: 1; padding: 12px; font-weight: bold; background: #ffaa00; color: #000; border: none; border-radius: 6px;">
+                    Pagado (Transf)
                 </button>
             </div>
+            <button type="submit" id="btnGenerarFree" onclick="window.modoPago='free'" style="display:none; width: 100%; margin-top: 10px; padding: 12px; font-weight: bold; background: #0099ff; color: #fff; border: none; border-radius: 6px;">
+                Generar Free Pass (Costo $0)
+            </button>
         </form>
         <div id="resultadoLink"></div>
     </div>
@@ -98,13 +87,31 @@
         <ul id="listaMisVentas" style="list-style: none; padding: 0;"></ul>
     </div>
 
+    <!-- MÓDULO NUEVO: AFORO Y ARQUEO -->
+    <div class="container" id="seccionEstadisticas">
+        <h2>Aforo y Arqueo (En Vivo)</h2>
+        <select id="eventoSelectEstadisticas" onchange="cargarEstadisticas(this.value)">
+            <option value="">Seleccioná un evento para ver métricas...</option>
+        </select>
+        <button class="btn-actualizar" onclick="actualizarEstadisticas()">↻ Actualizar Datos</button>
+        
+        <div id="estadisticasContent" style="display:none;">
+            <h3 style="color:#00ffcc; border-bottom: 1px solid #333; padding-bottom: 5px;">Monitor de Aforo</h3>
+            <ul id="listaAforo" style="list-style: none; padding: 0;"></ul>
+            
+            <h3 style="color:#ffaa00; border-bottom: 1px solid #333; padding-bottom: 5px; margin-top: 20px;">Arqueo de Caja (Efectivo)</h3>
+            <ul id="listaArqueo" style="list-style: none; padding: 0;"></ul>
+
+            <h3 style="color:#0099ff; border-bottom: 1px solid #333; padding-bottom: 5px; margin-top: 20px;">Free Pass Emitidos</h3>
+            <ul id="listaFrees" style="list-style: none; padding: 0;"></ul>
+        </div>
+    </div>
+
     <div class="container" id="seccionReportes">
         <h2>Reportes y Usuarios</h2>
         <button class="btn-actualizar" onclick="cargarReportes()">Actualizar Datos</button>
-        
         <h3 style="margin-top: 20px;">Ventas por Vendedor (Solo Pagados)</h3>
         <ul id="listaVentasAdmin" style="list-style: none; padding: 0;"></ul>
-        
         <h3 style="margin-top: 20px;">Lista de Usuarios</h3>
         <ul id="listaUsuariosAdmin" style="list-style: none; padding: 0;"></ul>
     </div>
@@ -123,11 +130,9 @@
     <div class="container" id="seccionSectores">
         <h2>Crear Sector</h2>
         <form id="sectorForm">
-            <select id="eventoSelectSector" required>
-                <option value="">Seleccioná un evento...</option>
-            </select>
+            <select id="eventoSelectSector" required><option value="">Seleccioná evento...</option></select>
             <input type="text" id="nombreSector" placeholder="Ej: VIP, General, +21" required>
-            <input type="number" id="capacidadSector" placeholder="Capacidad máxima (Aforo)" required>
+            <input type="number" id="capacidadSector" placeholder="Capacidad máxima" required>
             <button type="submit">Guardar Sector</button>
         </form>
     </div>
@@ -135,15 +140,11 @@
     <div class="container" id="seccionPreventas">
         <h2>Configurar Tandas</h2>
         <form id="preventaForm">
-            <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value); cargarPreventasAdmin(this.value);">
-                <option value="">Seleccioná un evento...</option>
-            </select>
-            <select id="sectorSelectPreventa" required>
-                <option value="">Primero seleccioná un evento...</option>
-            </select>
+            <select id="eventoSelectPreventa" required onchange="cargarSectoresPreventa(this.value); cargarPreventasAdmin(this.value);"><option value="">Seleccioná evento...</option></select>
+            <select id="sectorSelectPreventa" required><option value="">Primero seleccioná evento...</option></select>
             <input type="text" id="nombrePreventa" placeholder="Ej: Preventa 1" required>
             <input type="number" id="precioPreventa" placeholder="Precio ($)" required>
-            <label style="font-size: 12px; color: #aaa; font-weight: 500;">Fecha límite (opcional):</label>
+            <label style="font-size: 12px; color: #aaa;">Fecha límite (opcional):</label>
             <input type="datetime-local" id="fechaLimitePreventa">
             <button type="submit">Guardar Preventa</button>
         </form>
@@ -156,17 +157,15 @@
         <form id="staffForm" onkeydown="return event.key != 'Enter';">
             <input type="text" id="nuevoNombre" placeholder="Nombre" required>
             <input type="text" id="nuevoApellido" placeholder="Apellido" required>
-            <input type="tel" id="nuevoWhatsapp" inputmode="tel" pattern="[\+0-9]*" value="+549" required>
-            <input type="email" id="nuevoEmail" placeholder="Email del usuario" required>
+            <input type="tel" id="nuevoWhatsapp" value="+549" required>
+            <input type="email" id="nuevoEmail" placeholder="Email" required>
             <input type="password" id="nuevoPass" placeholder="Contraseña" required>
             <select id="nuevoRol" onchange="toggleEventoStaff(this.value)">
                 <option value="Admin">Administrador</option>
                 <option value="Vendedor">Vendedor (RRPP)</option>
                 <option value="Boleteria">Boletería</option>
             </select>
-            <select id="eventoSelectStaff" style="display: none;">
-                <option value="">Seleccioná un evento para asignar...</option>
-            </select>
+            <select id="eventoSelectStaff" style="display: none;"><option value="">Seleccionar evento...</option></select>
             <button type="button" onclick="enviarStaffForm()">Crear Usuario</button>
         </form>
     </div>
@@ -190,33 +189,24 @@
             document.getElementById('seccionVentas').style.display = 'none';
             document.getElementById('seccionMisVentas').style.display = 'none';
             document.getElementById(idSeccion).style.display = 'block';
-            
             document.getElementById('btnNavVentas').classList.remove('active');
             document.getElementById('btnNavMisVentas').classList.remove('active');
             document.getElementById(idBoton).classList.add('active');
-
             if (idSeccion === 'seccionMisVentas') cargarMisVentas();
         }
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const res = await fetch(`${API_URL}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: document.getElementById('emailLogin').value, password: document.getElementById('passLogin').value })
             });
             const data = await res.json();
-            
             if (data.token) {
                 token = data.token; userRol = data.rol; userEventoId = data.evento_id;
                 localStorage.setItem('hype_token', token); localStorage.setItem('hype_rol', userRol);
                 if(userEventoId) localStorage.setItem('hype_evento_id', userEventoId);
-                
-                if (userRol === 'Boleteria') {
-                    window.location.href = '/boleteria';
-                } else {
-                    mostrarDashboard();
-                }
+                if (userRol === 'Boleteria') window.location.href = '/boleteria'; else mostrarDashboard();
             } else {
                 document.getElementById('loginError').innerText = data.error;
                 document.getElementById('loginError').style.display = 'block';
@@ -228,7 +218,9 @@
             document.getElementById('logoutContainer').style.display = 'block';
             
             if (userRol === 'Fundador' || userRol === 'Admin') {
+                document.getElementById('btnGenerarFree').style.display = 'block';
                 document.getElementById('seccionVentas').style.display = 'block';
+                document.getElementById('seccionEstadisticas').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'block';
                 document.getElementById('seccionSectores').style.display = 'block';
                 document.getElementById('seccionPreventas').style.display = 'block';
@@ -250,346 +242,178 @@
 
         document.getElementById('eventoForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await fetch(`${API_URL}/eventos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ nombre: document.getElementById('nombre').value, fecha: document.getElementById('fecha').value })
-            });
+            await fetch(`${API_URL}/eventos`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ nombre: document.getElementById('nombre').value, fecha: document.getElementById('fecha').value }) });
             cargarEventos();
         });
 
         document.getElementById('sectorForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const evento_id = document.getElementById('eventoSelectSector').value;
-            const res = await fetch(`${API_URL}/sectores`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id, nombre: document.getElementById('nombreSector').value, capacidad: document.getElementById('capacidadSector').value })
-            });
+            const res = await fetch(`${API_URL}/sectores`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ evento_id: document.getElementById('eventoSelectSector').value, nombre: document.getElementById('nombreSector').value, capacidad: document.getElementById('capacidadSector').value }) });
             const data = await res.json();
-            if (data.id) { alert('Sector creado'); document.getElementById('sectorForm').reset(); cargarEventos(); } 
-            else alert(data.error);
+            if (data.id) { alert('Sector creado'); document.getElementById('sectorForm').reset(); cargarEventos(); } else alert(data.error);
         });
 
         document.getElementById('preventaForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const evento_id = document.getElementById('eventoSelectPreventa').value;
-            const res = await fetch(`${API_URL}/preventas`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ 
-                    evento_id, sector_id: document.getElementById('sectorSelectPreventa').value, 
-                    nombre: document.getElementById('nombrePreventa').value, 
-                    precio: document.getElementById('precioPreventa').value, 
-                    fecha_limite: document.getElementById('fechaLimitePreventa').value || null 
-                })
-            });
+            const res = await fetch(`${API_URL}/preventas`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ evento_id, sector_id: document.getElementById('sectorSelectPreventa').value, nombre: document.getElementById('nombrePreventa').value, precio: document.getElementById('precioPreventa').value, fecha_limite: document.getElementById('fechaLimitePreventa').value || null }) });
             const data = await res.json();
-            if (data.id) { alert('Preventa creada'); document.getElementById('preventaForm').reset(); cargarPreventasAdmin(evento_id); } 
-            else alert(data.error);
+            if (data.id) { alert('Preventa creada'); document.getElementById('preventaForm').reset(); cargarPreventasAdmin(evento_id); } else alert(data.error);
         });
 
         function toggleEventoStaff(rol) {
             const sel = document.getElementById('eventoSelectStaff');
-            if (rol === 'Vendedor' || rol === 'Boleteria') { sel.style.display = 'block'; sel.required = true; } 
-            else { sel.style.display = 'none'; sel.required = false; sel.value = ''; }
+            if (rol === 'Vendedor' || rol === 'Boleteria') { sel.style.display = 'block'; sel.required = true; } else { sel.style.display = 'none'; sel.required = false; sel.value = ''; }
         }
 
         async function enviarStaffForm() {
-            const nombre = document.getElementById('nuevoNombre').value;
-            const apellido = document.getElementById('nuevoApellido').value;
-            const whatsapp = document.getElementById('nuevoWhatsapp').value;
-            const email = document.getElementById('nuevoEmail').value;
-            const password = document.getElementById('nuevoPass').value;
-            const rol = document.getElementById('nuevoRol').value;
-            const evento_id = document.getElementById('eventoSelectStaff').value;
+            const payload = { email: document.getElementById('nuevoEmail').value, password: document.getElementById('nuevoPass').value, rol: document.getElementById('nuevoRol').value, evento_id: document.getElementById('eventoSelectStaff').value || null, nombre: document.getElementById('nuevoNombre').value, apellido: document.getElementById('nuevoApellido').value, whatsapp: document.getElementById('nuevoWhatsapp').value };
+            if (!payload.email || !payload.password || !payload.nombre || !payload.apellido) return alert('Completá los campos clave');
+            if ((payload.rol === 'Vendedor' || payload.rol === 'Boleteria') && !payload.evento_id) return alert('Asigná un evento.');
 
-            if (!email || !password || !nombre || !apellido || !whatsapp) return alert('Completá todos los campos');
-            if ((rol === 'Vendedor' || rol === 'Boleteria') && !evento_id) return alert('Asigná un evento.');
-
-            const res = await fetch(`${API_URL}/usuarios`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ email, password, rol, evento_id: evento_id || null, nombre, apellido, whatsapp })
-            });
-            const data = await res.json();
-            alert(data.mensaje || data.error);
-            document.getElementById('staffForm').reset();
-            toggleEventoStaff('Admin'); 
-            cargarReportes();
+            const res = await fetch(`${API_URL}/usuarios`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload) });
+            const data = await res.json(); alert(data.mensaje || data.error);
+            document.getElementById('staffForm').reset(); toggleEventoStaff('Admin'); cargarReportes();
         }
 
         document.getElementById('ventasForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             let evento_id = userRol === 'Vendedor' ? userEventoId : document.getElementById('eventoSelectVentas').value;
-            const sector_id = document.getElementById('sectorSelectVentas').value;
-            const cantidad = document.getElementById('cantidadVentas').value;
-            const pago_manual = window.modoPago === 'manual';
-            
-            const email_comprador = document.getElementById('emailTransferencia').value;
+            const es_free = window.modoPago === 'free';
+            const payload = { 
+                evento_id, 
+                sector_id: document.getElementById('sectorSelectVentas').value, 
+                cantidad: document.getElementById('cantidadVentas').value, 
+                pago_manual: (window.modoPago === 'manual' || es_free), 
+                email_comprador: document.getElementById('emailTransferencia').value,
+                es_free: es_free
+            };
             
             const botones = e.target.querySelectorAll('button[type="submit"]');
             botones.forEach(b => b.disabled = true);
 
             try {
-                const res = await fetch(`${API_URL}/tickets`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ evento_id, sector_id, cantidad, pago_manual, email_comprador })
-                });
-                
+                const res = await fetch(`${API_URL}/tickets`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload) });
                 const data = await res.json();
-                
                 botones.forEach(b => b.disabled = false);
 
                if (data.links) {
                     const textoLinks = data.links.join('\n\n');
-                    const tipoEntrada = pago_manual ? 'las entradas (ya pagadas)' : 'los links de pago';
-                    
+                    const tipoEntrada = payload.pago_manual ? 'las entradas (ya activas)' : 'los links de pago';
                     const mensajeLimpio = `¡Hola! Acá tenés ${tipoEntrada} para tus ${data.cantidad} entradas (${data.tanda} - $${data.precio} c/u):\n\n${textoLinks}`;
                     const mensajeWa = encodeURIComponent(mensajeLimpio);
                     document.getElementById('ventasForm').style.display = 'none';
                     
                     navigator.clipboard.writeText(mensajeLimpio).catch(() => console.log('Error al auto-copiar'));
-
                     window.open(`https://wa.me/?text=${mensajeWa}`, '_blank');
                     
                     document.getElementById('resultadoLink').innerHTML = `
                         <div class="link-generado">
                             <p style="margin-top: 0; font-weight: 500; font-size: 16px; color: #00ffcc;">✅ ¡Generado, copiado y abriendo WhatsApp!</p>
-                            <p style="font-size: 12px; color: #aaa;">Si no se abrió automáticamente, usá los botones:</p>
                             <div style="display: flex; gap: 10px; margin-top: 15px; align-items: stretch;">
                                 <button type="button" onclick="copiarLink('${encodeURIComponent(textoLinks)}')" style="flex: 1; margin: 0; display: flex; align-items: center; justify-content: center;">📋 Copiar</button>
-                                <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="flex: 1; margin: 0; padding: 12px; background: #25D366; color: white; text-decoration: none; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-transform: uppercase; font-size: 15px; letter-spacing: 1px;">WhatsApp</a>
+                                <a href="https://wa.me/?text=${mensajeWa}" target="_blank" style="flex: 1; margin: 0; padding: 12px; background: #25D366; color: white; text-decoration: none; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-transform: uppercase; font-size: 15px;">WhatsApp</a>
                             </div>
                             <button type="button" onclick="nuevaVenta()" style="background: #444; color: #fff; margin-top: 15px; width: 100%;">+ Nueva Venta</button>
                         </div>
                     `;
-                    if (userRol !== 'Vendedor') cargarReportes(); 
-                } else {
-                    alert(data.error || 'Error al generar links');
-                }
-            } catch (err) {
-                botones.forEach(b => b.disabled = false);
-                alert("Error de conexión");
-            }
+                    if (userRol !== 'Vendedor') { cargarReportes(); actualizarEstadisticas(); }
+                } else { alert(data.error || 'Error'); }
+            } catch (err) { botones.forEach(b => b.disabled = false); alert("Error de conexión"); }
         });
         
-        function nuevaVenta() {
-            document.getElementById('resultadoLink').innerHTML = '';
-            document.getElementById('cantidadVentas').value = 1;
-            document.getElementById('emailTransferencia').value = '';
-            document.getElementById('ventasForm').style.display = 'block';
-        }
+        function nuevaVenta() { document.getElementById('resultadoLink').innerHTML = ''; document.getElementById('cantidadVentas').value = 1; document.getElementById('emailTransferencia').value = ''; document.getElementById('ventasForm').style.display = 'block'; }
+        function copiarLink(texto) { navigator.clipboard.writeText(decodeURIComponent(texto)).then(() => alert('¡Copiado!')).catch(() => alert('Error al copiar')); }
 
-        function copiarLink(textoCodificado) {
-            const texto = decodeURIComponent(textoCodificado);
-            navigator.clipboard.writeText(texto).then(() => {
-                alert('¡Link copiado!');
-            }).catch(() => alert('Error al copiar'));
-        }
+        async function borrarEvento(id) { if(confirm('¿Eliminar evento?')) { await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarEventos(); } }
+        async function borrarPreventa(id, evento_id) { if(confirm('¿Eliminar preventa?')) { await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarPreventasAdmin(evento_id); } }
 
-        async function borrarEvento(id) {
-            if(confirm('¿Eliminar evento?')) { await fetch(`${API_URL}/eventos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarEventos(); }
-        }
-
-        async function borrarPreventa(id, evento_id) {
-            if(confirm('¿Eliminar preventa?')) { 
-                await fetch(`${API_URL}/preventas/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); 
-                cargarPreventasAdmin(evento_id); 
-            }
-        }
-
-        async function editarPreventa(id, evento_id, n, p, f) {
-            const nn = prompt("Nombre de tanda:", n); if (!nn) return;
-            const np = prompt("Precio ($):", p); if (!np) return;
-            const nf = prompt("Fecha límite (YYYY-MM-DD HH:MM o vacío):", f ? f.replace('T', ' ').substring(0, 16) : '');
-            const res = await fetch(`${API_URL}/preventas/${id}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ nombre: nn, precio: np, fecha_limite: nf || null })
-            });
-            const data = await res.json();
-            if (data.id) { alert('Preventa actualizada'); cargarPreventasAdmin(evento_id); } else alert('Error');
+        async function editarPreventa(id, ev_id, n, p, f) {
+            const nn = prompt("Nombre:", n); if (!nn) return; const np = prompt("Precio:", p); if (!np) return; const nf = prompt("Fecha límite:", f ? f.replace('T', ' ').substring(0, 16) : '');
+            await fetch(`${API_URL}/preventas/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ nombre: nn, precio: np, fecha_limite: nf || null }) });
+            cargarPreventasAdmin(ev_id);
         }
 
         async function cargarEventos() {
-            const res = await fetch(`${API_URL}/eventos`);
-            const eventos = await res.json();
-            if (userRol === 'Fundador' || userRol === 'Admin') {
-                document.getElementById('listaEventos').innerHTML = eventos.map(e => `<li><span style="flex: 1;"><strong>${e.nombre}</strong> - ${new Date(e.fecha).toLocaleString()}</span>${userRol === 'Fundador' ? `<div style="display: flex; gap: 8px;"><button class="btn-borrar" onclick="borrarEvento(${e.id})">Eliminar</button></div>` : ''}</li>`).join('');
-            }
+            const res = await fetch(`${API_URL}/eventos`); const eventos = await res.json();
+            if (userRol === 'Fundador' || userRol === 'Admin') document.getElementById('listaEventos').innerHTML = eventos.map(e => `<li><span style="flex: 1;"><strong>${e.nombre}</strong> - ${new Date(e.fecha).toLocaleString()}</span>${userRol === 'Fundador' ? `<div style="display: flex; gap: 8px;"><button class="btn-borrar" onclick="borrarEvento(${e.id})">Eliminar</button></div>` : ''}</li>`).join('');
             const opts = '<option value="">Seleccioná un evento...</option>' + eventos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
-            ['eventoSelectVentas', 'eventoSelectSector', 'eventoSelectPreventa', 'eventoSelectStaff'].forEach(id => document.getElementById(id).innerHTML = opts);
+            ['eventoSelectVentas', 'eventoSelectSector', 'eventoSelectPreventa', 'eventoSelectStaff', 'eventoSelectEstadisticas'].forEach(id => document.getElementById(id).innerHTML = opts);
         }
 
         async function cargarSectoresVentas(id) {
-            const sel = document.getElementById('sectorSelectVentas');
-            if (!id) return sel.innerHTML = '<option value="">Primero seleccioná un evento...</option>';
+            const sel = document.getElementById('sectorSelectVentas'); if (!id) return sel.innerHTML = '<option value="">Primero seleccioná evento...</option>';
             const res = await fetch(`${API_URL}/sectores/${id}`); const sec = await res.json();
-            sel.innerHTML = '<option value="">Seleccioná un sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre} (Cap: ${s.capacidad})</option>`).join('');
+            sel.innerHTML = '<option value="">Seleccioná sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre} (Cap: ${s.capacidad})</option>`).join('');
         }
 
         async function cargarSectoresPreventa(id) {
-            const sel = document.getElementById('sectorSelectPreventa');
-            if (!id) return sel.innerHTML = '<option value="">Primero seleccioná un evento...</option>';
+            const sel = document.getElementById('sectorSelectPreventa'); if (!id) return sel.innerHTML = '<option value="">Primero seleccioná evento...</option>';
             const res = await fetch(`${API_URL}/sectores/${id}`); const sec = await res.json();
-            sel.innerHTML = '<option value="">Seleccioná un sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+            sel.innerHTML = '<option value="">Seleccioná sector...</option>' + sec.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
         }
 
         async function cargarPreventasAdmin(id) {
-            const lst = document.getElementById('listaPreventasAdmin');
-            if (!id) return lst.innerHTML = '';
-            const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }});
-            const prev = await res.json();
-            
-            lst.innerHTML = prev.map(p => {
-                const btnBorrarPrev = userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarPreventa(${p.id}, ${id})">Borrar</button>` : '';
-                return `<li>
-                    <span style="flex: 1;"><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin límite'}</small></span>
-                    <div style="display: flex; gap: 8px; align-items: stretch;">
-                        <button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button>
-                        ${btnBorrarPrev}
-                    </div>
-                </li>`;
-            }).join('');
+            const lst = document.getElementById('listaPreventasAdmin'); if (!id) return lst.innerHTML = '';
+            const res = await fetch(`${API_URL}/preventas/${id}`, { headers: { 'Authorization': `Bearer ${token}` }}); const prev = await res.json();
+            lst.innerHTML = prev.map(p => `<li><span style="flex: 1;"><strong>[${p.sector_nombre}]</strong> ${p.nombre} - $${p.precio} <br><small>Límite: ${p.fecha_limite ? new Date(p.fecha_limite).toLocaleString() : 'Sin'}</small></span><div style="display: flex; gap: 8px; align-items: stretch;"><button class="btn-editar" onclick="editarPreventa(${p.id}, ${id}, '${p.nombre}', ${p.precio}, '${p.fecha_limite || ''}')">Editar</button>${userRol === 'Fundador' ? `<button class="btn-borrar" onclick="borrarPreventa(${p.id},${id})">Borrar</button>` : ''}</div></li>`).join('');
         }
+
+        async function cargarEstadisticas(evento_id) {
+            if (!evento_id) return document.getElementById('estadisticasContent').style.display = 'none';
+            try {
+                const res = await fetch(`${API_URL}/estadisticas/${evento_id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) return; const data = await res.json();
+                document.getElementById('estadisticasContent').style.display = 'block';
+                
+                document.getElementById('listaAforo').innerHTML = data.aforo.length === 0 ? '<li>Sin datos de ingreso aún.</li>' : data.aforo.map(a => `<li><span style="flex: 1;"><strong>${a.sector}</strong></span><div style="text-align: right;"><span class="stat-badge" style="background:#00ffcc; color:#000;">${a.ingresados} / ${a.total_emitidos} ingresados</span></div></li>`).join('');
+
+                if (data.arqueo.length === 0) document.getElementById('listaArqueo').innerHTML = '<li>No hay ventas en efectivo.</li>';
+                else {
+                    let totalCaja = 0;
+                    const items = data.arqueo.map(a => { totalCaja += Number(a.total_efectivo); return `<li><span style="flex: 1;"><strong>${a.nombre} ${a.apellido}</strong> <small>(${a.rol})</small></span><div style="text-align: right;"><span class="stat-badge">${a.cantidad} tickets</span> <span class="stat-badge" style="background:#ffaa00; color:#000;">$${a.total_efectivo}</span></div></li>`; }).join('');
+                    document.getElementById('listaArqueo').innerHTML = items + `<li style="background: #222; border-color: #ffaa00;"><span style="flex: 1; color: #ffaa00;"><strong>TOTAL EFECTIVO</strong></span><div style="text-align: right;"><span class="stat-badge" style="background:#ffaa00; color:#000; font-size: 14px;">$${totalCaja}</span></div></li>`;
+                }
+
+                if (data.frees.length === 0) document.getElementById('listaFrees').innerHTML = '<li>No se emitieron Free Pass.</li>';
+                else {
+                    let totalFrees = 0;
+                    const itemsFrees = data.frees.map(f => { totalFrees += Number(f.cantidad); return `<li><span style="flex: 1;"><strong>${f.nombre} ${f.apellido}</strong> <small>(${f.rol})</small></span><span class="stat-badge" style="background:#0099ff; color:#fff;">${f.cantidad} emitidos</span></li>`; }).join('');
+                    document.getElementById('listaFrees').innerHTML = itemsFrees + `<li style="background: #222; border-color: #0099ff;"><span style="flex: 1; color: #0099ff;"><strong>TOTAL FREE PASS</strong></span><span class="stat-badge" style="background:#0099ff; color:#fff; font-size: 14px;">${totalFrees}</span></li>`;
+                }
+            } catch (err) { console.error("Error cargando estadísticas:", err); }
+        }
+
+        function actualizarEstadisticas() { const ev = document.getElementById('eventoSelectEstadisticas').value; if(ev) cargarEstadisticas(ev); }
 
         async function cargarReportes() {
             if (userRol !== 'Fundador' && userRol !== 'Admin') return;
-            
             try {
                 const resVentas = await fetch(`${API_URL}/reportes/ventas`, { headers: { 'Authorization': `Bearer ${token}` }});
-                
-                if (!resVentas.ok) {
-                    if (resVentas.status === 403) {
-                        alert("Tu sesión expiró. Por favor, volvé a iniciar sesión.");
-                        cerrarSesion();
-                    }
-                    return;
-                }
-
+                if (!resVentas.ok) { if (resVentas.status === 403) { alert("Tu sesión expiró."); cerrarSesion(); } return; }
                 const ventas = await resVentas.json();
-                
-                if (Array.isArray(ventas)) {
-                    document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => {
-                        const btnBorrarVentas = (userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" style="margin-top: 8px;" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : '';
-                        const nombreCompleto = v.nombre ? `${v.nombre} ${v.apellido}` : v.email;
-                        const linkWa = v.whatsapp ? `<a href="https://wa.me/${v.whatsapp}" class="wa-link" target="_blank">${v.whatsapp}</a>` : 'N/A';
-                        
-                        return `<li>
-                            <span style="flex: 1;"><strong>${nombreCompleto}</strong> (${v.rol})<br><small style="color:#aaa;">WA: ${linkWa}</small></span>
-                            <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
-                                <div>
-                                    <span class="stat-badge">${v.total_tickets} tickets pagados</span> 
-                                    <span class="stat-badge" style="background:#00ffcc; color:#000;">$${v.total_recaudado}</span>
-                                </div>
-                                ${btnBorrarVentas}
-                            </div>
-                        </li>`;
-                    }).join('');
-                }
+                document.getElementById('listaVentasAdmin').innerHTML = ventas.map(v => `<li><span style="flex: 1;"><strong>${v.nombre} ${v.apellido}</strong> (${v.rol})</span><div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;"><div><span class="stat-badge">${v.total_tickets} tickets</span> <span class="stat-badge" style="background:#00ffcc; color:#000;">$${v.total_recaudado}</span></div>${(userRol === 'Fundador' && v.total_tickets > 0) ? `<button class="btn-borrar" onclick="borrarVentasVendedor(${v.id})">Borrar Ventas</button>` : ''}</div></li>`).join('');
 
                 const resUsu = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${token}` }});
-                if (!resUsu.ok) return;
-
                 const usuarios = await resUsu.json();
-                if (Array.isArray(usuarios)) {
-                    document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
-                        let btnBorrarUsu = '';
-                        let btnAsignarUsu = '';
-                        
-                        if (userRol === 'Fundador') {
-                            btnBorrarUsu = `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>`;
-                            btnAsignarUsu = `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar Evento</button>`;
-                        } else if (userRol === 'Admin') {
-                            btnAsignarUsu = `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar Evento</button>`;
-                            if (u.rol !== 'Fundador') {
-                                btnBorrarUsu = `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>`;
-                            }
-                        }
-
-                        const nombreCompleto = u.nombre ? `${u.nombre} ${u.apellido}` : u.email;
-                        const linkWa = u.whatsapp ? `<a href="https://wa.me/${u.whatsapp}" class="wa-link" target="_blank">${u.whatsapp}</a>` : 'N/A';
-
-                        return `<li>
-                            <span style="flex: 1;"><strong>${nombreCompleto}</strong><br><small style="color:#aaa;">Email: ${u.email} | WA: ${linkWa} | Rol: ${u.rol} ${u.evento_asignado ? `| Evento actual: ${u.evento_asignado}` : ''}</small></span>
-                            <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: stretch;">
-                                ${btnAsignarUsu}
-                                ${btnBorrarUsu}
-                            </div>
-                        </li>`;
-                    }).join('');
-                }
-            } catch (err) {
-                console.error("Error cargando reportes:", err);
-            }
+                document.getElementById('listaUsuariosAdmin').innerHTML = usuarios.map(u => {
+                    let btnBorrarUsu = '', btnAsignarUsu = '';
+                    if (userRol === 'Fundador') { btnBorrarUsu = `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>`; btnAsignarUsu = `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar</button>`; }
+                    else if (userRol === 'Admin') { btnAsignarUsu = `<button class="btn-editar" onclick="cambiarEventoUsuario(${u.id})">Asignar</button>`; if (u.rol !== 'Fundador') btnBorrarUsu = `<button class="btn-borrar" onclick="borrarUsuario(${u.id})">Borrar</button>`; }
+                    return `<li><span style="flex: 1;"><strong>${u.nombre} ${u.apellido}</strong><br><small style="color:#aaa;">Email: ${u.email} | Rol: ${u.rol} ${u.evento_asignado ? `| Evento: ${u.evento_asignado}` : ''}</small></span><div style="display: flex; gap: 8px; flex-shrink: 0; align-items: stretch;">${btnAsignarUsu}${btnBorrarUsu}</div></li>`;
+                }).join('');
+            } catch (err) { console.error("Error cargando reportes:", err); }
         }
 
-        async function borrarUsuario(id) {
-            if(confirm('¿Seguro querés eliminar a este usuario?')) {
-                await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-                cargarReportes();
-            }
-        }
-
-        async function cambiarEventoUsuario(id) {
-            const res = await fetch(`${API_URL}/eventos`);
-            const eventos = await res.json();
-            
-            let opciones = "Ingresá el NÚMERO del nuevo evento (o 0 para quitar asignación):\n\n0 - Ninguno\n";
-            eventos.forEach(e => opciones += `${e.id} - ${e.nombre}\n`);
-            
-            const eventoIdPrompt = prompt(opciones);
-            if (eventoIdPrompt === null) return; 
-            
-            const nuevoEventoId = parseInt(eventoIdPrompt) > 0 ? parseInt(eventoIdPrompt) : null;
-            
-            const resPut = await fetch(`${API_URL}/usuarios/${id}/evento`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ evento_id: nuevoEventoId })
-            });
-            
-            const data = await resPut.json();
-            alert(data.mensaje || data.error);
-            cargarReportes(); 
-        }
-
-        async function borrarVentasVendedor(id) {
-            if(confirm('¿Seguro querés eliminar TODAS las ventas de este vendedor? Los tickets ya generados dejarán de ser válidos.')) {
-                await fetch(`${API_URL}/ventas/vendedor/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-                cargarReportes();
-            }
-        }
+        async function borrarUsuario(id) { if(confirm('¿Seguro querés eliminar a este usuario?')) { await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarReportes(); } }
+        async function cambiarEventoUsuario(id) { const res = await fetch(`${API_URL}/eventos`); const eventos = await res.json(); let opciones = "NÚMERO de evento (o 0 para quitar):\\n\\n0 - Ninguno\\n"; eventos.forEach(e => opciones += `${e.id} - ${e.nombre}\\n`); const eventoIdPrompt = prompt(opciones); if (eventoIdPrompt === null) return; await fetch(`${API_URL}/usuarios/${id}/evento`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ evento_id: parseInt(eventoIdPrompt) > 0 ? parseInt(eventoIdPrompt) : null }) }); cargarReportes(); }
+        async function borrarVentasVendedor(id) { if(confirm('¿Seguro querés eliminar ventas?')) { await fetch(`${API_URL}/ventas/vendedor/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }}); cargarReportes(); } }
 
         async function cargarMisVentas() {
-            const res = await fetch(`${API_URL}/mis-ventas`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const ventas = await res.json();
-            
-            const ticketsPagados = ventas.filter(v => v.estado === 'Pagado');
-            const totalTickets = ticketsPagados.length;
-            const totalRecaudado = ticketsPagados.reduce((acc, v) => acc + Number(v.precio), 0);
-            
-            document.getElementById('resumenMisVentas').innerHTML = `
-                <span class="stat-badge" style="background:#333;">${totalTickets} pagados</span> 
-                <span class="stat-badge" style="background:#00ffcc; color:#000;">Total: $${totalRecaudado}</span>
-            `;
-            
-            document.getElementById('listaMisVentas').innerHTML = ventas.map((v) => {
-                const linkUrl = `https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`;
-                const fechaVenta = v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : 'Fecha no registrada';
-                const badgeColor = v.estado === 'Pagado' ? '#00ffcc' : '#ffaa00';
-                const badgeText = '#000';
-                
-                return `<li>
-                    <span style="flex: 1;"><strong>${v.sector}</strong> - $${v.precio}<br>
-                    <small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Gen: ${fechaVenta}</small></span>
-                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
-                        <span class="stat-badge" style="background:${badgeColor}; color:${badgeText}; display: inline-block;">${v.estado}</span>
-                        <button type="button" style="width: auto; padding: 6px 12px; margin: 0; font-size: 12px; background: #333; color: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center;" onclick="copiarLink('${encodeURIComponent(linkUrl)}')">📋 Link</button>
-                    </div>
-                </li>`;
-            }).join('');
+            const res = await fetch(`${API_URL}/mis-ventas`, { headers: { 'Authorization': `Bearer ${token}` } }); const ventas = await res.json();
+            const tkts = ventas.filter(v => v.estado === 'Pagado');
+            document.getElementById('resumenMisVentas').innerHTML = `<span class="stat-badge" style="background:#333;">${tkts.length} pagados</span> <span class="stat-badge" style="background:#00ffcc; color:#000;">Total: $${tkts.reduce((acc, v) => acc + Number(v.precio), 0)}</span>`;
+            document.getElementById('listaMisVentas').innerHTML = ventas.map(v => `<li><span style="flex: 1;"><strong>${v.sector}</strong> - $${v.precio}<br><small style="color:#aaa;">Evento: ${v.evento || 'N/A'} | Gen: ${v.fecha_venta ? new Date(v.fecha_venta).toLocaleString() : ''}</small></span><div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;"><span class="stat-badge" style="background:${v.estado === 'Pagado' ? '#00ffcc' : '#ffaa00'}; color:#000;">${v.estado}</span><button type="button" style="width: auto; padding: 6px 12px; margin: 0; font-size: 12px; background: #333; color: #fff; border-radius: 4px;" onclick="copiarLink('${encodeURIComponent(`https://hypevenue.up.railway.app/comprar/${v.codigo_qr}`)}')">📋 Link</button></div></li>`).join('');
         }
     </script>
 </body>
