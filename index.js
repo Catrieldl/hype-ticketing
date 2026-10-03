@@ -100,6 +100,15 @@ app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- RUTA EXPORTAR CLIENTES ---
+app.get('/api/reportes/clientes', verificarToken, async (req, res) => {
+    if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+    try {
+        const clientes = await pool.query(`SELECT nombre_comprador, apellido_comprador, email_comprador, whatsapp_comprador, sexo, fecha_nacimiento FROM tickets WHERE nombre_comprador IS NOT NULL AND estado = 'Pagado' ORDER BY fecha_venta DESC`);
+        res.json(clientes.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/mis-ventas', verificarToken, async (req, res) => {
   try {
     const misVentas = await pool.query(`SELECT t.codigo_qr, t.precio, t.sector, t.fecha_venta, t.estado, e.nombre AS evento FROM tickets t LEFT JOIN eventos e ON t.evento_id = e.id WHERE t.vendedor_id = $1 ORDER BY COALESCE(t.fecha_venta, '1970-01-01') DESC, t.id DESC`, [req.usuario.id]);
@@ -111,6 +120,50 @@ app.delete('/api/ventas/vendedor/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo Fundador' });
   try { await pool.query('DELETE FROM tickets WHERE vendedor_id = $1', [req.params.id]); res.json({ mensaje: 'Borradas' }); } 
   catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- RUTA CONFIGURACIÓN (TOGGLE NAVE) ---
+app.get('/api/config', async (req, res) => {
+    try {
+        const conf = await pool.query("SELECT valor FROM configuracion WHERE clave = 'nave_habilitado'");
+        res.json({ nave_habilitado: conf.rows.length > 0 ? conf.rows[0].valor : true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/config/nave', verificarToken, async (req, res) => {
+    if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo Fundador' });
+    try {
+        const current = await pool.query("SELECT valor FROM configuracion WHERE clave = 'nave_habilitado'");
+        const nuevoValor = !(current.rows[0]?.valor ?? true);
+        await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('nave_habilitado', $1) ON CONFLICT (clave) DO UPDATE SET valor = $1", [nuevoValor]);
+        res.json({ mensaje: nuevoValor ? 'Nave ACTIVADO' : 'Nave DESACTIVADO' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- RUTAS LISTA NEGRA ---
+app.get('/api/lista-negra', verificarToken, async (req, res) => {
+    if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+    try {
+        const lista = await pool.query('SELECT * FROM lista_negra ORDER BY fecha_bloqueo DESC');
+        res.json(lista.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/lista-negra', verificarToken, async (req, res) => {
+    if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+    try {
+        const { email, motivo } = req.body;
+        await pool.query('INSERT INTO lista_negra (email, motivo) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING', [email, motivo || '']);
+        res.json({ mensaje: 'Email agregado a la lista negra' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/lista-negra/:id', verificarToken, async (req, res) => {
+    if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+    try {
+        await pool.query('DELETE FROM lista_negra WHERE id = $1', [req.params.id]);
+        res.json({ mensaje: 'Email desbloqueado' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- RUTA ESTADÍSTICAS: AFORO Y ARQUEO ---
@@ -315,10 +368,17 @@ app.get('/simulador-pago/:codigo', (req, res) => {
     `);
 });
 
-// --- RUTA ACTIVAR TICKET (Captura de datos) ---
+// --- RUTA ACTIVAR TICKET (Captura de datos y Filtro Lista Negra) ---
 app.post('/api/tickets/:codigo/activar', async (req, res) => {
     try {
         const { nombre, apellido, email, whatsapp, sexo, fecha_nacimiento } = req.body;
+        
+        // Bloqueo Lista Negra
+        const bloqueado = await pool.query('SELECT id FROM lista_negra WHERE email = $1', [email]);
+        if (bloqueado.rows.length > 0) {
+            return res.status(403).json({ error: 'Acceso denegado: El correo ingresado se encuentra bloqueado por derecho de admisión.' });
+        }
+
         const result = await pool.query(
             `UPDATE tickets SET nombre_comprador = $1, apellido_comprador = $2, email_comprador = $3, whatsapp_comprador = $4, sexo = $5, fecha_nacimiento = $6 
              WHERE codigo_qr = $7 AND estado = 'Pagado' RETURNING *`,
@@ -378,7 +438,12 @@ app.get('/comprar/:codigo', async (req, res) => {
                     e.preventDefault(); document.getElementById('btnActivar').innerText = 'Generando...'; document.getElementById('btnActivar').disabled = true;
                     const body = { nombre: document.getElementById('nombre').value, apellido: document.getElementById('apellido').value, email: document.getElementById('email').value, whatsapp: document.getElementById('whatsapp').value, sexo: document.getElementById('sexo').value, fecha_nacimiento: document.getElementById('fecha_nac').value };
                     const res = await fetch('/api/tickets/${ticket.codigo_qr}/activar', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
-                    if(res.ok) window.location.reload(); else { alert('Error al activar'); document.getElementById('btnActivar').innerText = 'Generar mi QR'; document.getElementById('btnActivar').disabled = false; }
+                    if(res.ok) window.location.reload(); 
+                    else { 
+                        const data = await res.json();
+                        alert(data.error || 'Error al activar'); 
+                        document.getElementById('btnActivar').innerText = 'Generar mi QR'; document.getElementById('btnActivar').disabled = false; 
+                    }
                 });
             </script></body></html>
         `);
