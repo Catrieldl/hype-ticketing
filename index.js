@@ -95,7 +95,7 @@ app.get('/api/usuarios', verificarToken, async (req, res) => {
 app.get('/api/reportes/ventas', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
   try {
-    const ventas = await pool.query(`SELECT u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp, COUNT(t.id) as total_tickets, COALESCE(SUM(t.precio), 0) as total_recaudado FROM usuarios u LEFT JOIN tickets t ON u.id = t.vendedor_id WHERE t.estado = 'Pagado' GROUP BY u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp ORDER BY total_tickets DESC`);
+    const ventas = await pool.query(`SELECT u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp, COUNT(t.id) as total_tickets, COALESCE(SUM(t.precio), 0) as total_recaudado FROM usuarios u LEFT JOIN tickets t ON u.id = t.vendedor_id WHERE t.estado = 'Pagado' AND t.precio > 0 GROUP BY u.id, u.email, u.rol, u.nombre, u.apellido, u.whatsapp ORDER BY total_tickets DESC`);
     res.json(ventas.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -111,6 +111,33 @@ app.delete('/api/ventas/vendedor/:id', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'Fundador') return res.status(403).json({ error: 'Solo Fundador' });
   try { await pool.query('DELETE FROM tickets WHERE vendedor_id = $1', [req.params.id]); res.json({ mensaje: 'Borradas' }); } 
   catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- RUTA ESTADÍSTICAS: AFORO Y ARQUEO ---
+app.get('/api/estadisticas/:evento_id', verificarToken, async (req, res) => {
+    if (req.usuario.rol !== 'Fundador' && req.usuario.rol !== 'Admin') return res.status(403).json({ error: 'Sin permisos' });
+    try {
+        const aforo = await pool.query(`
+            SELECT sector, COUNT(*) as total_emitidos, SUM(CASE WHEN estado = 'Usado' THEN 1 ELSE 0 END) as ingresados
+            FROM tickets WHERE evento_id = $1 AND estado IN ('Pagado', 'Usado') GROUP BY sector
+        `, [req.params.evento_id]);
+
+        const arqueo = await pool.query(`
+            SELECT u.nombre, u.apellido, u.rol, COUNT(t.id) as cantidad, SUM(t.precio) as total_efectivo
+            FROM tickets t JOIN usuarios u ON t.vendedor_id = u.id
+            WHERE t.evento_id = $1 AND t.pago_manual = true AND t.precio > 0 AND t.estado IN ('Pagado', 'Usado')
+            GROUP BY u.id, u.nombre, u.apellido, u.rol
+        `, [req.params.evento_id]);
+
+        const frees = await pool.query(`
+            SELECT u.nombre, u.apellido, u.rol, COUNT(t.id) as cantidad
+            FROM tickets t JOIN usuarios u ON t.vendedor_id = u.id
+            WHERE t.evento_id = $1 AND t.precio = 0 AND t.estado IN ('Pagado', 'Usado')
+            GROUP BY u.id, u.nombre, u.apellido, u.rol
+        `, [req.params.evento_id]);
+
+        res.json({ aforo: aforo.rows, arqueo: arqueo.rows, frees: frees.rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- RUTAS DE EVENTOS, SECTORES Y PREVENTAS ---
@@ -154,7 +181,7 @@ app.delete('/api/preventas/:id', verificarToken, async (req, res) => {
 // --- RUTAS DE TICKETS (VENTA) ---
 app.post('/api/tickets', verificarToken, async (req, res) => {
   try {
-    let { evento_id, sector_id, cantidad, pago_manual, email_comprador } = req.body; 
+    let { evento_id, sector_id, cantidad, pago_manual, email_comprador, es_free } = req.body; 
     const vendedor_id = req.usuario.id; 
     cantidad = parseInt(cantidad) || 1;
 
@@ -169,7 +196,15 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
 
     const preventaQuery = await pool.query('SELECT * FROM preventas WHERE evento_id = $1 AND sector_id = $2 AND (fecha_limite IS NULL OR fecha_limite >= NOW()) ORDER BY fecha_limite ASC LIMIT 1', [evento_id, sector_id]);
     if (preventaQuery.rows.length === 0) return res.status(400).json({ error: 'No hay preventas activas' });
-    const preventaActiva = preventaQuery.rows[0];
+    
+    let precioTicket = preventaQuery.rows[0].precio;
+    let nombreTanda = preventaQuery.rows[0].nombre;
+
+    if (es_free && (req.usuario.rol === 'Fundador' || req.usuario.rol === 'Admin')) {
+        precioTicket = 0;
+        nombreTanda = 'Free Pass';
+        pago_manual = true; 
+    }
 
     const eventoQuery = await pool.query('SELECT nombre FROM eventos WHERE id = $1', [evento_id]);
     const eventoNombre = eventoQuery.rows[0] ? eventoQuery.rows[0].nombre : 'Evento Hype';
@@ -182,7 +217,7 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
         
         await pool.query(
           'INSERT INTO tickets (evento_id, vendedor_id, codigo_qr, precio, sector, estado, fecha_venta, email_comprador) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)',
-          [evento_id, vendedor_id, codigo_qr, preventaActiva.precio, sector.nombre, estado_inicial, email_comprador || null]
+          [evento_id, vendedor_id, codigo_qr, precioTicket, sector.nombre, estado_inicial, email_comprador || null]
         );
         
         const linkEntrada = `https://hypevenue.up.railway.app/comprar/${codigo_qr}`;
@@ -195,7 +230,7 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
                 to: [{ email: email_comprador }],
                 subject: `Tu entrada para ${eventoNombre} está lista`,
                 htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
-                        <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
+                        <h1 style="color: #00ffcc;">¡Generación Exitosa!</h1>
                         <p>Ya tenés tu lugar asegurado en el sector <strong>${sector.nombre}</strong>.</p>
                         <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 20px 0;">
                             <img src="${qrImageUrl}" alt="Tu Código QR" style="display: block; width: 200px; height: 200px;">
@@ -206,18 +241,13 @@ app.post('/api/tickets', verificarToken, async (req, res) => {
             };
 
             axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
-                headers: {
-                    'api-key': process.env.BREVO_API_KEY, 
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json' }
             }).catch(err => console.error('Error Brevo manual:', err.message));
         }
     }
 
-    res.json({ links: linksGenerados, precio: preventaActiva.precio, tanda: preventaActiva.nombre, cantidad });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    res.json({ links: linksGenerados, precio: precioTicket, tanda: nombreTanda, cantidad });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- RUTA INICIAR PAGO (SIMULADOR) ---
@@ -226,18 +256,14 @@ app.post('/api/iniciar-pago', async (req, res) => {
       const { codigo, email } = req.body;
       const ticketQ = await pool.query('UPDATE tickets SET email_comprador = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', [email, codigo, 'Pendiente']);
       if (ticketQ.rows.length === 0) return res.status(400).json({ error: 'Ticket no válido o ya pagado.' });
-      
       res.json({ url: `/simulador-pago/${codigo}` }); 
-  } catch (err) {
-      res.status(500).json({ error: 'Error del servidor.' });
-  }
+  } catch (err) { res.status(500).json({ error: 'Error del servidor.' }); }
 });
 
 // --- WEBHOOK DE NAVE ---
 app.post('/api/webhooks/nave', async (req, res) => {
     try {
         const { status, reference } = req.body; 
-
         if (status === 'approved' || status === 'paid') {
             const result = await pool.query('UPDATE tickets SET estado = $1 WHERE codigo_qr = $2 AND estado = $3 RETURNING *', ['Pagado', reference, 'Pendiente']);
             
@@ -256,76 +282,36 @@ app.post('/api/webhooks/nave', async (req, res) => {
                     htmlContent: `<div style="font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #111; color: #fff; border-radius: 10px;">
                             <h1 style="color: #00ffcc;">¡Pago Exitoso!</h1>
                             <p>Ya tenés tu lugar asegurado en el sector <strong>${ticketPagado.sector}</strong>.</p>
-                            
                             <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 20px 0;">
                                 <img src="${qrImageUrl}" alt="Tu Código QR" style="display: block; width: 200px; height: 200px;">
                             </div>
-                            
                             <p>Mostrá este QR en puerta.</p>
                             <a href="${linkEntrada}" style="background: #00ffcc; color: #000; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; display: inline-block; margin-top: 20px;">VER MI ENTRADA ONLINE</a>
                            </div>`
                 };
 
                 axios.post('https://api.brevo.com/v3/smtp/email', correoData, {
-                    headers: {
-                        'api-key': process.env.BREVO_API_KEY,
-                        'Content-Type': 'application/json'
-                    }
-                }).then(() => console.log('Correo enviado por API exitosamente'))
-                  .catch(err => console.error('Error enviando API:', err.response?.data || err.message));
+                    headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json' }
+                }).catch(err => console.error('Error enviando API:', err.response?.data || err.message));
             }
         }
         res.sendStatus(200);
-    } catch (err) {
-        res.sendStatus(500);
-    }
+    } catch (err) { res.sendStatus(500); }
 });
 
 // --- PANTALLA DEL SIMULADOR DE PAGO ---
 app.get('/simulador-pago/:codigo', (req, res) => {
-    const codigo = req.params.codigo;
     res.send(`
         <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Simulador de Pago</title>
-            <style>
-                body { font-family: Arial, sans-serif; background: #000; color: #fff; text-align: center; padding: 50px 20px; }
-                h2 { color: #00ffcc; text-transform: uppercase; letter-spacing: 1px; }
-                .btn { background: #00ffcc; color: #000; padding: 15px 30px; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; width: 100%; max-width: 300px; }
-                .btn:active { background: #00cc99; }
-            </style>
-        </head>
-        <body>
-            <h2>Entorno de Pruebas</h2>
-            <p>Hacé clic abajo para simular un pago aprobado.</p>
-            <button class="btn" onclick="simular()">Simular Pago Exitoso</button>
-            <script>
-                async function simular() {
-                    document.querySelector('.btn').innerText = "Procesando...";
-                    
-                    const res = await fetch('/api/webhooks/nave', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            reference: "${codigo}", 
-                            status: "approved" 
-                        }) 
-                    });
-
-                    if(res.ok) {
-                        alert("✅ Pago simulado con éxito. El QR ya está generado.");
-                        window.location.href = '/comprar/${codigo}';
-                    } else {
-                        alert("❌ Hubo un error en la simulación.");
-                        document.querySelector('.btn').innerText = "Reintentar";
-                    }
-                }
-            </script>
-        </body>
-        </html>
+        <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:50px 20px;}h2{color:#00ffcc;}.btn{background:#00ffcc;color:#000;padding:15px;font-weight:bold;border:none;cursor:pointer;}</style></head>
+        <body><h2>Entorno de Pruebas</h2><button class="btn" onclick="simular()">Simular Pago Exitoso</button>
+        <script>
+            async function simular() {
+                const res = await fetch('/api/webhooks/nave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: "${req.params.codigo}", status: "approved" }) });
+                if(res.ok) window.location.href = '/comprar/${req.params.codigo}'; else alert("Error");
+            }
+        </script></body></html>
     `);
 });
 
@@ -333,7 +319,7 @@ app.get('/simulador-pago/:codigo', (req, res) => {
 app.get('/comprar/:codigo', async (req, res) => {
   try {
     const ticketQuery = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [req.params.codigo]);
-    if (ticketQuery.rows.length === 0) return res.status(404).send('<h1>Ticket no encontrado o inválido</h1>');
+    if (ticketQuery.rows.length === 0) return res.status(404).send('<h1>Ticket no encontrado</h1>');
 
     const ticket = ticketQuery.rows[0];
     const eventoQuery = await pool.query('SELECT * FROM eventos WHERE id = $1', [ticket.evento_id]);
@@ -342,92 +328,29 @@ app.get('/comprar/:codigo', async (req, res) => {
     if (ticket.estado === 'Pendiente') {
         return res.send(`
             <!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Completar Pago - Hype Venue</title>
-                <style>
-                    body { font-family: 'Arial', sans-serif; background: #000; color: #fff; text-align: center; padding: 40px; }
-                    .card { background: #111; padding: 30px; border-radius: 12px; max-width: 400px; margin: auto; border: 1px solid #333; }
-                    input, button { width: 100%; padding: 12px; margin-top: 15px; box-sizing: border-box; border-radius: 6px; font-size: 16px; }
-                    input { background: #222; color: #fff; border: 1px solid #444; }
-                    button { background: #00ffcc; color: #000; border: none; font-weight: bold; cursor: pointer; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h2 style="color: #00ffcc; margin-top:0;">HYPE VENUE</h2>
-                    <h3>${evento} - Sector: ${ticket.sector}</h3>
-                    <p>Total a pagar: <strong>$${ticket.precio}</strong></p>
-                    <p style="font-size: 14px; color: #aaa;">Ingresá tu correo electrónico. A este mail te va a llegar la entrada con el código QR una vez que finalices el pago.</p>
-                    
-                    <form id="formPago">
-                        <input type="email" id="emailCompra" placeholder="tu-correo@ejemplo.com" required>
-                        <button type="submit" id="btnPagar">Ir a Pagar</button>
-                    </form>
-                </div>
-                <script>
-                    document.getElementById('formPago').addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        const btn = document.getElementById('btnPagar');
-                        btn.innerText = 'Redirigiendo...';
-                        btn.disabled = true;
-
-                        const email = document.getElementById('emailCompra').value;
-                        const response = await fetch('/api/iniciar-pago', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ codigo: '${ticket.codigo_qr}', email: email })
-                        });
-                        const data = await response.json();
-                        if(data.url) window.location.href = data.url; 
-                        else alert('Error al iniciar pago');
-                    });
-                </script>
-            </body>
-            </html>
+            <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:40px;}.card{background:#111;padding:30px;border-radius:12px;max-width:400px;margin:auto;}input,button{width:100%;padding:12px;margin-top:15px;}button{background:#00ffcc;color:#000;border:none;cursor:pointer;}</style></head>
+            <body><div class="card"><h2 style="color:#00ffcc;">HYPE VENUE</h2><h3>${evento} - Sector: ${ticket.sector}</h3><p>Total: <strong>$${ticket.precio}</strong></p>
+            <form id="formPago"><input type="email" id="emailCompra" placeholder="tu-correo@ejemplo.com" required><button type="submit">Ir a Pagar</button></form></div>
+            <script>
+                document.getElementById('formPago').addEventListener('submit', async (e) => {
+                    e.preventDefault(); const res = await fetch('/api/iniciar-pago', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ codigo: '${ticket.codigo_qr}', email: document.getElementById('emailCompra').value }) });
+                    const data = await res.json(); if(data.url) window.location.href = data.url; else alert('Error');
+                });
+            </script></body></html>
         `);
     }
 
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}`;
     res.send(`
       <!DOCTYPE html>
-      <html lang="es">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Tu Entrada - Hype Venue</title>
-          <style>
-              body { font-family: Arial; background: #000; color: #fff; text-align: center; padding: 40px; }
-              .card { background: #111; padding: 30px; border-radius: 12px; max-width: 400px; margin: auto; border: 2px solid #00ffcc; box-shadow: 0 0 20px rgba(0, 255, 204, 0.2); }
-              h1 { color: #00ffcc; margin-bottom: 10px; letter-spacing: 3px;}
-              .precio { font-size: 24px; color: #00ffcc; font-weight: bold; margin: 20px 0; }
-              .info { margin: 10px 0; color: #ccc; }
-              .badge-pagado { background: #00ffcc; color: #000; display: inline-block; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; }
-          </style>
-      </head>
-      <body>
-          <div class="card">
-              <div class="badge-pagado">✔ PAGADO</div>
-              <h1>HYPE VENUE</h1>
-              <h3>${evento}</h3>
-              <p class="info">Sector: <strong>${ticket.sector}</strong></p>
-              <div class="precio">$${ticket.precio}</div>
-              
-              <div style="background: #fff; padding: 15px; border-radius: 10px; display: inline-block; margin: 15px 0;">
-                  <img src="${qrImageUrl}" alt="Código QR" style="display: block; width: 200px; height: 200px;">
-              </div>
-              
-              <p style="font-size: 12px; color: #888;">Código único: ${ticket.codigo_qr}</p>
-              <p style="margin-top: 20px; font-size: 14px; color: #ffaa00;">Presentá este QR en puerta.</p>
-          </div>
-      </body>
-      </html>
+      <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>body{font-family:Arial;background:#000;color:#fff;text-align:center;padding:40px;}.card{background:#111;padding:30px;border-radius:12px;max-width:400px;margin:auto;border:2px solid #00ffcc;}</style></head>
+      <body><div class="card"><div style="background:#00ffcc;color:#000;display:inline-block;padding:5px 15px;border-radius:20px;font-weight:bold;">✔ HABILITADO</div>
+      <h1 style="color:#00ffcc;">HYPE VENUE</h1><h3>${evento}</h3><p>Sector: <strong>${ticket.sector}</strong></p><div style="font-size:24px;color:#00ffcc;font-weight:bold;">$${ticket.precio}</div>
+      <div style="background:#fff;padding:15px;border-radius:10px;display:inline-block;margin:15px 0;"><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${ticket.codigo_qr}" style="width:200px;height:200px;"></div>
+      <p style="color:#ffaa00;">Presentá este QR en puerta.</p></div></body></html>
     `);
-  } catch (err) {
-    res.status(500).send('Error en el servidor');
-  }
+  } catch (err) { res.status(500).send('Error'); }
 });
 
 // --- RUTAS PARA ESCÁNER EN PUERTA ---
@@ -436,48 +359,25 @@ app.get('/api/escanear/:codigo', async (req, res) => {
         const query = await pool.query('SELECT * FROM tickets WHERE codigo_qr = $1', [req.params.codigo]);
         if (query.rows.length === 0) return res.status(404).json({ error: 'Ticket no encontrado' });
         res.json(query.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/escanear/:codigo/usar', async (req, res) => {
     try {
-        const result = await pool.query(
-            "UPDATE tickets SET estado = 'Usado' WHERE codigo_qr = $1 AND estado = 'Pagado' RETURNING *", 
-            [req.params.codigo]
-        );
+        const result = await pool.query("UPDATE tickets SET estado = 'Usado' WHERE codigo_qr = $1 AND estado = 'Pagado' RETURNING *", [req.params.codigo]);
         if (result.rows.length === 0) return res.status(400).json({ error: 'El ticket no está Pagado o ya fue Usado' });
         res.json({ mensaje: 'Acceso autorizado', ticket: result.rows[0] });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Ruta para servir la boletería
-app.get('/boleteria', (req, res) => {
-    res.sendFile(path.join(__dirname, 'boleteria.html'));
-});
-
-// Ruta para servir el archivo del escáner
-app.get('/scanner', (req, res) => {
-    res.sendFile(path.join(__dirname, 'scanner.html'));
-});
+app.get('/boleteria', (req, res) => res.sendFile(path.join(__dirname, 'boleteria.html')));
+app.get('/scanner', (req, res) => res.sendFile(path.join(__dirname, 'scanner.html')));
 
 const PORT = process.env.PORT || 3000;
 
-// --- RUTINA DE LIMPIEZA AUTOMÁTICA (CARRITOS ABANDONADOS) ---
 setInterval(async () => {
-    try {
-        const result = await pool.query(
-            "DELETE FROM tickets WHERE estado = 'Pendiente' AND fecha_venta < NOW() - INTERVAL '24 hours'"
-        );
-        if (result.rowCount > 0) {
-            console.log(`Limpieza automática: ${result.rowCount} tickets Pendientes eliminados.`);
-        }
-    } catch (err) {
-        console.error('Error en la limpieza automática:', err.message);
-    }
-}, 3600000); // 1 hora
+    try { await pool.query("DELETE FROM tickets WHERE estado = 'Pendiente' AND fecha_venta < NOW() - INTERVAL '24 hours'"); } 
+    catch (err) { console.error('Error limpieza:', err.message); }
+}, 3600000); 
 
 app.listen(PORT, () => console.log(`Puerto ${PORT}`));
