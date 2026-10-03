@@ -9,9 +9,8 @@
         body { font-family: Arial, sans-serif; background: #000; color: #fff; margin: 0; padding: 20px; text-align: center; }
         h2 { color: #00ffcc; margin-top: 0; text-transform: uppercase; letter-spacing: 2px; }
         
-        /* Control estricto del tamaño del lector */
+        /* Lector limpio sin recuadros extra de la librería */
         #reader { width: 100%; max-width: 350px; margin: 0 auto; border: 2px solid #333; border-radius: 8px; background: #111; overflow: hidden; }
-        #reader button { background: #00ffcc; color: #000; border: none; padding: 10px; border-radius: 4px; font-weight: bold; margin-top: 10px; cursor: pointer; }
         
         #resultado { margin-top: 20px; padding: 20px; border-radius: 8px; font-size: 18px; font-weight: bold; display: none; max-width: 310px; margin: 20px auto 0 auto; }
         .estado-ok { background: #00ffcc; color: #000; }
@@ -19,22 +18,28 @@
         .estado-usado { background: #ffaa00; color: #000; }
         
         .btn-reiniciar { background: #333; color: #fff; border: 1px solid #555; padding: 15px; border-radius: 6px; margin-top: 15px; cursor: pointer; font-weight: bold; width: 100%; max-width: 350px; display: none; margin-left: auto; margin-right: auto; }
+        #btnIniciar { background: #00ffcc; color: #000; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; margin-bottom: 15px; width: 100%; max-width: 350px; }
     </style>
 </head>
 <body>
     <h2>Control de Puerta</h2>
-    <div id="reader"></div>
+    <!-- Botón inicial para que el navegador nos deje prender la cámara sin bloquearnos -->
+    <button id="btnIniciar" onclick="iniciarCamara()">Encender Cámara</button>
+    
+    <div id="reader" style="display: none;"></div>
     <div id="resultado"></div>
     <button id="btnReiniciar" class="btn-reiniciar" onclick="reiniciarScanner()">Escanear otro ticket</button>
 
     <script>
         const API_URL = '/api';
-        let html5QrcodeScanner;
+        let html5QrCode;
         
         function onScanSuccess(decodedText, decodedResult) {
-            html5QrcodeScanner.clear(); 
-            document.getElementById('reader').style.display = 'none';
-            procesarTicket(decodedText.split('/').pop()); // Extrae el UUID si leen el link completo
+            // Frena la cámara al instante para ahorrar batería y no leer 2 veces
+            html5QrCode.stop().then(() => {
+                document.getElementById('reader').style.display = 'none';
+                procesarTicket(decodedText.split('/').pop());
+            });
         }
 
         async function procesarTicket(codigo) {
@@ -79,16 +84,27 @@
         function reiniciarScanner() {
             document.getElementById('resultado').style.display = 'none';
             document.getElementById('btnReiniciar').style.display = 'none';
+            iniciarCamara();
+        }
+
+        function iniciarCamara() {
+            document.getElementById('btnIniciar').style.display = 'none';
             document.getElementById('reader').style.display = 'block';
-            iniciarScanner();
+            
+            // Usamos la clase base sin interfaz gráfica
+            html5QrCode = new Html5Qrcode("reader");
+            
+            // Forzamos la cámara trasera ("environment")
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                onScanSuccess
+            ).catch(err => {
+                alert("Aceptá los permisos de cámara para continuar.");
+                document.getElementById('btnIniciar').style.display = 'block';
+                document.getElementById('reader').style.display = 'none';
+            });
         }
-
-        function iniciarScanner() {
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
-            html5QrcodeScanner.render(onScanSuccess);
-        }
-
-        window.onload = iniciarScanner;
     </script>
 </body>
 </html>
